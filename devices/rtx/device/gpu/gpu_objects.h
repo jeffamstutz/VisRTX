@@ -672,7 +672,7 @@ struct FastRendererGPUData
 
 struct QualityRendererGPUData
 {
-  int maxDepth;
+  int maxRayDepth;
 };
 
 struct InteractiveRendererGPUData
@@ -711,7 +711,6 @@ struct RendererGPUData
   RendererBackgroundGPUData background;
   glm::vec3 ambientColor;
   int numIterations;
-  int maxRayDepth;
   float ambientIntensity;
   float inverseVolumeSamplingRate;
   float occlusionDistance;

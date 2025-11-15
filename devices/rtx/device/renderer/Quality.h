@@ -46,9 +46,7 @@ struct Quality : public Renderer
 
   static ptx_blob ptx();
 
- private:
-  int m_maxDepth{0};
-  float m_R{0.5f};
+  int m_maxRayDepth{5};
 };
 
 } // namespace visrtx

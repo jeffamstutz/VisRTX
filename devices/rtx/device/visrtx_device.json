@@ -402,7 +402,7 @@
             "ANARI_INT32"
           ],
           "tags": [],
-          "default": 3,
+          "default": 5,
           "minimum": 1,
           "description": "Maximum number of ray bounces"
         }

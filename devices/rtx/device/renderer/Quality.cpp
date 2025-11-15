@@ -32,27 +32,30 @@
 #include "Quality.h"
 // ptx
 #include "Quality_ptx.h"
+// std
+#include <array>
 
 namespace visrtx {
 
-static const std::vector<HitgroupFunctionNames> g_qualityHitNames = {
-    {"__closesthit__", "__anyhit__"}};
+static const std::array<HitgroupFunctionNames, 2> g_qualityHitNames = {
+    HitgroupFunctionNames{"__closesthit__shading", "__anyhit__shading"},
+    HitgroupFunctionNames{"__closesthit__shadow", "__anyhit__shadow"}};
 
-static const std::vector<std::string> g_qualityMissNames = {"__miss__", "__miss__"};
+static const auto g_qualityMissNames =
+    std::array<std::string, 2>{"__miss__shading", "__miss__shadow"};
 
-
-Quality::Quality(DeviceGlobalState *s) : Renderer(s, 1.f) {}
+Quality::Quality(DeviceGlobalState *s) : Renderer(s) {}
 
 void Quality::commitParameters()
 {
   Renderer::commitParameters();
-  m_maxDepth = std::clamp(getParam<int>("maxDepth", 5), 1, 256);
+  m_maxRayDepth = std::max(getParam<int>("maxRayDepth", 5), 1);
 }
 
 void Quality::populateFrameData(FrameGPUData &fd) const
 {
   Renderer::populateFrameData(fd);
-  fd.renderer.params.quality.maxDepth = m_maxDepth;
+  fd.renderer.params.quality.maxRayDepth = m_maxRayDepth;
 }
 
 OptixModule Quality::optixModule() const

@@ -83,7 +83,6 @@ struct Renderer : public Object
  protected:
   vec4 m_bgColor{0.f, 0.f, 0.f, 1.f};
   int m_spp{1};
-  int m_maxRayDepth{0};
   vec3 m_ambientColor{1.f};
   float m_ambientIntensity{0.f};
   float m_occlusionDistance{1e20f};
@@ -91,7 +90,8 @@ struct Renderer : public Object
   bool m_denoise{false};
   bool m_denoiseAlbedo{false};
   bool m_denoiseNormal{false};
-  bool m_tonemap{true}; // enable internal tonemapping during sample accumulation
+  bool m_tonemap{
+      true}; // enable internal tonemapping during sample accumulation
   int m_sampleLimit{0};
   bool m_cullTriangleBF{false};
   bool m_premultiplyBackground{false};

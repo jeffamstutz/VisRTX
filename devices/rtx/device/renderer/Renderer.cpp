@@ -34,8 +34,8 @@
 #include <helium/utility/TimeStamp.h>
 
 // specific renderers
-#include "Fast.h"
 #include "Debug.h"
+#include "Fast.h"
 #include "Interactive.h"
 #include "Quality.h"
 #include "Test.h"
@@ -152,7 +152,6 @@ void Renderer::commitParameters()
   m_backgroundImage = getParamObject<Array2D>("background");
   m_bgColor = getParam<vec4>("background", vec4(vec3(0.f), 1.f));
   m_spp = getParam<int>("pixelSamples", 1);
-  m_maxRayDepth = getParam<int>("maxRayDepth", 5);
   m_ambientColor = getParam<vec3>("ambientColor", vec3(1.f));
   m_ambientIntensity =
       getParam<float>("ambientRadiance", m_defaultAmbientRadiance);
@@ -210,7 +209,6 @@ void Renderer::populateFrameData(FrameGPUData &fd) const
   fd.renderer.tonemap = m_tonemap;
   fd.renderer.inverseVolumeSamplingRate = 1.f / m_volumeSamplingRate;
   fd.renderer.numIterations = std::max(m_spp, 1);
-  fd.renderer.maxRayDepth = m_maxRayDepth;
   fd.renderer.premultiplyBackground = m_premultiplyBackground;
 }
 
