@@ -183,11 +183,13 @@ box3 StructuredRegularField::bounds() const
   if (!isValid())
     return {box3(vec3(0.f), vec3(1.f))};
   auto dims = m_data->size();
-  // Node-centered: index space [0, dims-1], cell-centered: index space [0, dims]
+  // Node-centered: index space [0, dims-1], cell-centered: index space [0,
+  // dims]
   float extentX = m_cellCentered ? float(dims.x) : float(dims.x - 1);
   float extentY = m_cellCentered ? float(dims.y) : float(dims.y - 1);
   float extentZ = m_cellCentered ? float(dims.z) : float(dims.z - 1);
-  return box3(m_origin, m_origin + (vec3(extentX, extentY, extentZ) * m_spacing));
+  return box3(
+      m_origin, m_origin + (vec3(extentX, extentY, extentZ) * m_spacing));
 }
 
 float StructuredRegularField::stepSize() const
@@ -202,7 +204,8 @@ SpatialFieldGPUData StructuredRegularField::gpuData() const
   sf.samplerCallableIndex = SbtCallableEntryPoints::SpatialFieldSamplerRegular;
   sf.data.structuredRegular.texObj = m_textureObject;
   sf.data.structuredRegular.origin = m_origin;
-  sf.data.structuredRegular.invDims = 1.0f / vec3(dims.x - 1, dims.y - 1, dims.z - 1);
+  sf.data.structuredRegular.invDims =
+      1.0f / vec3(dims.x - 1, dims.y - 1, dims.z - 1);
   sf.data.structuredRegular.invSpacing = 1.0f / m_spacing;
   sf.data.structuredRegular.cellCentered = m_cellCentered;
   sf.grid = m_uniformGrid.gpuData();
@@ -230,7 +233,7 @@ void StructuredRegularField::buildGrid()
   m_uniformGrid.init(ivec3(dims.x, dims.y, dims.z), bounds());
 
   size_t numVoxels = (dims.x - 1) * size_t(dims.y - 1) * (dims.z - 1);
-  m_uniformGrid.buildGrid(gpuData());
+  m_uniformGrid.computeValueRanges(gpuData());
 }
 
 } // namespace visrtx

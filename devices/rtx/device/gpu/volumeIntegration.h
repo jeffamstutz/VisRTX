@@ -32,6 +32,7 @@
 #pragma once
 
 #include "gpu/dda.h"
+#include "gpu/gpu_decl.h"
 #include "gpu/gpu_objects.h"
 #include "gpu/gpu_util.h"
 #include "gpu/shadingState.h"
@@ -233,16 +234,25 @@ VISRTX_DEVICE float _sampleDistance(ScreenSample &ss,
   objRay.t.upper -= hit.localRay.t.lower;
 
   auto woodcockFunc = [&](const int leafID, float t0, float t1) {
-    const float majorant = field.grid.maxOpacities[leafID];
+    const float maxOpacity = field.grid.maxOpacities[leafID];
     float t = t0;
 
     constexpr float EPSILON = 1e-7f;
-    if (majorant <= EPSILON)
+    if (maxOpacity <= EPSILON)
       return true; // Skip empty voxels
 
+    // Correct extinction from opacity: σ = -ln(1-α) / unitDistance
+    // The opacity α represents the probability of absorption over unitDistance,
+    // so transmittance T = 1-α = exp(-σ·unitDistance), giving σ = -ln(1-α)/d
+    // Clamp maxOpacity to avoid log(0) for fully opaque regions
+    const float clampedMaxOpacity = glm::min(maxOpacity, 0.9999f);
+    const float majorantExtinction =
+        -logf(1.f - clampedMaxOpacity) * svv.oneOverUnitDistance;
+
     while (t < t1) {
-      t += -logf(1.f - curand_uniform(&ss.rs))
-          / (majorant * svv.oneOverUnitDistance);
+      // Sample free-flight distance using majorant extinction
+      t += -logf(fmaxf(1e-10f, 1.f - curand_uniform(&ss.rs)))
+          / majorantExtinction;
 
       if (t >= t1)
         break; // We've left this voxel
@@ -253,10 +263,15 @@ VISRTX_DEVICE float _sampleDistance(ScreenSample &ss,
 
       if (!glm::isnan(s)) {
         const vec4 co = detail::classifySample(volume, s);
-        const float actualExtinction = co.w * svv.oneOverUnitDistance;
+        // Correct extinction from opacity: σ = -ln(1-α) / unitDistance
+        const float clampedOpacity = glm::min(co.w, 0.9999f);
+        const float actualExtinction = (clampedOpacity > EPSILON)
+            ? -logf(1.f - clampedOpacity) * svv.oneOverUnitDistance
+            : 0.f;
 
+        // Acceptance test: P(accept) = σ_actual / σ_majorant
         float u = curand_uniform(&ss.rs);
-        if (actualExtinction >= u * majorant) {
+        if (actualExtinction >= u * majorantExtinction) {
           // Real collision - ray scattered
           albedo = vec3(co);
           extinction = actualExtinction;
@@ -413,7 +428,10 @@ VISRTX_DEVICE float sampleDistanceAllVolumes(ScreenSample &ss,
       objID = hit.volume->id;
       instID = hit.instance->id;
     }
-    ray.t.lower = hit.localRay.t.upper + 1e-3f;
+    if (ray.t.lower < hit.localRay.t.upper)
+      ray.t.lower = hit.localRay.t.upper;
+    else
+      break;
   }
 
   return depth;

@@ -144,19 +144,24 @@ SpatialFieldGPUData NvdbRegularField::gpuData() const
   auto gridType = m_gridMetadata->gridType();
   switch (gridType) {
   case nanovdb::GridType::Fp4:
-    sf.samplerCallableIndex = SbtCallableEntryPoints::SpatialFieldSamplerNvdbFp4;
+    sf.samplerCallableIndex =
+        SbtCallableEntryPoints::SpatialFieldSamplerNvdbFp4;
     break;
   case nanovdb::GridType::Fp8:
-    sf.samplerCallableIndex = SbtCallableEntryPoints::SpatialFieldSamplerNvdbFp8;
+    sf.samplerCallableIndex =
+        SbtCallableEntryPoints::SpatialFieldSamplerNvdbFp8;
     break;
   case nanovdb::GridType::Fp16:
-    sf.samplerCallableIndex = SbtCallableEntryPoints::SpatialFieldSamplerNvdbFp16;
+    sf.samplerCallableIndex =
+        SbtCallableEntryPoints::SpatialFieldSamplerNvdbFp16;
     break;
   case nanovdb::GridType::FpN:
-    sf.samplerCallableIndex = SbtCallableEntryPoints::SpatialFieldSamplerNvdbFpN;
+    sf.samplerCallableIndex =
+        SbtCallableEntryPoints::SpatialFieldSamplerNvdbFpN;
     break;
   case nanovdb::GridType::Float:
-    sf.samplerCallableIndex = SbtCallableEntryPoints::SpatialFieldSamplerNvdbFloat;
+    sf.samplerCallableIndex =
+        SbtCallableEntryPoints::SpatialFieldSamplerNvdbFloat;
     break;
   default:
     sf.samplerCallableIndex = SbtCallableEntryPoints::Invalid;
@@ -187,7 +192,7 @@ void NvdbRegularField::buildGrid()
 {
   auto gridSize = m_gridMetadata->indexBBox().dim();
   m_uniformGrid.init(ivec3(gridSize[0], gridSize[1], gridSize[2]), m_bounds);
-  m_uniformGrid.buildGrid(gpuData());
+  m_uniformGrid.computeValueRanges(gpuData());
 }
 
 } // namespace visrtx

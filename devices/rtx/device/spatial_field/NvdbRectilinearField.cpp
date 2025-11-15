@@ -170,8 +170,8 @@ void NvdbRectilinearField::finalize()
     std::array<helium::ChangeObserverPtr<Array1D> *, 3> axes = {
         &m_axisArrayX, &m_axisArrayY, &m_axisArrayZ};
     for (int axis = 0; axis < 3; ++axis) {
-      const auto *axisData = static_cast<const float *>(
-          (*axes[axis])->data(AddressSpace::HOST));
+      const auto *axisData =
+          static_cast<const float *>((*axes[axis])->data(AddressSpace::HOST));
       size_t n = (*axes[axis])->size();
       float extent = axisData[n - 1] - axisData[0];
       m_invAvgVoxelSize[axis] = m_cellCentered
@@ -299,7 +299,7 @@ void NvdbRectilinearField::buildGrid()
 {
   auto gridSize = m_gridMetadata->indexBBox().dim();
   m_uniformGrid.init(ivec3(gridSize[0], gridSize[1], gridSize[2]), m_bounds);
-  m_uniformGrid.buildGrid(gpuData());
+  m_uniformGrid.computeValueRanges(gpuData());
 }
 
 } // namespace visrtx

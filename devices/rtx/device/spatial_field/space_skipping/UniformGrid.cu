@@ -30,28 +30,13 @@
  */
 
 #include <cuda_runtime_api.h>
+#include <limits>
 #include "UniformGrid.h"
-#include "UniformGridSamplers.h"
+#include "UniformGridAccessors.h"
 #include "gpu/gpu_math.h"
 #include "gpu/gpu_objects.h"
-#include "gpu/shadingState.h"
-#include "gpu/uniformGrid.h"
-#ifdef __CUDA_ARCH__
-#include "gpu/gpu_util.h"
-#endif
 
 namespace visrtx {
-
-__global__ void invalidateRangesGPU(box1 *valueRanges, const ivec3 dims)
-{
-  size_t threadID = blockIdx.x * size_t(blockDim.x) + threadIdx.x;
-
-  if (threadID >= dims.x * size_t(dims.y) * dims.z)
-    return;
-
-  valueRanges[threadID].lower = +1e30f;
-  valueRanges[threadID].upper = -1e30f;
-}
 
 __global__ void computeMaxOpacitiesGPU(float *maxOpacities,
     const box1 *valueRanges,
@@ -72,154 +57,163 @@ __global__ void computeMaxOpacitiesGPU(float *maxOpacities,
     return;
   }
 
-  valueRange.lower -= xfRange.lower;
-  valueRange.lower /= xfRange.upper - xfRange.lower;
-  valueRange.upper -= xfRange.lower;
-  valueRange.upper /= xfRange.upper - xfRange.lower;
+  const float xfRangeSize = xfRange.upper - xfRange.lower;
+  if (xfRangeSize <= 0.f) {
+    maxOpacities[threadID] = 0.f;
+    return;
+  }
 
-  int lo = glm::clamp(
-      int(valueRange.lower * (numColors - 1)), 0, int(numColors - 1));
+  float normalizedLo = (valueRange.lower - xfRange.lower) / xfRangeSize;
+  float normalizedHi = (valueRange.upper - xfRange.lower) / xfRangeSize;
+
+  const float tfEntrySize = 1.0f / float(numColors);
+  normalizedLo -= tfEntrySize;
+  normalizedHi += tfEntrySize;
+
+  int lo =
+      glm::clamp(int(normalizedLo * (numColors - 1)), 0, int(numColors - 1));
   int hi = glm::clamp(
-      int(valueRange.upper * (numColors - 1)) + 1, 0, int(numColors - 1));
+      int(normalizedHi * (numColors - 1)) + 1, 0, int(numColors - 1));
 
   float maxOpacity = 0.f;
   for (int i = lo; i <= hi; ++i) {
     float tc = (i + .5f) / numColors;
     maxOpacity = fmaxf(maxOpacity, tex1D<::float4>(colorMap, tc).w);
   }
+
   maxOpacities[threadID] = maxOpacity;
 }
 
-template <typename Sampler>
-__global__ void buildGridGPU(box1 *valueRanges,
-    ivec3 dims,
-    box3 worldBounds,
+template <typename VoxelAccessor>
+__global__ void computeValueRangesGPU(box1 *valueRanges,
+    ivec3 mcDims,
+    ivec3 fieldDims,
     const SpatialFieldGPUData *sfgd)
 {
-  Sampler sampler(*sfgd);
+  VoxelAccessor accessor(*sfgd);
 
   size_t threadID = blockIdx.x * size_t(blockDim.x) + threadIdx.x;
 
-  size_t numVoxels = size_t(dims.x) * dims.y * dims.z;
+  size_t numMCs = size_t(mcDims.x) * mcDims.y * mcDims.z;
 
-  if (threadID >= numVoxels)
+  if (threadID >= numMCs)
     return;
 
-  ivec3 voxelID(threadID % dims.x,
-      threadID / dims.x % dims.y,
-      threadID / (dims.x * dims.y));
+  ivec3 mcID(threadID % mcDims.x,
+      threadID / mcDims.x % mcDims.y,
+      threadID / (mcDims.x * mcDims.y));
 
-  vec3 worldExtend = size(worldBounds);
-  vec3 voxelExtend = worldExtend / vec3(dims);
-  box3 voxelBounds(worldBounds.lower + vec3(voxelID) * voxelExtend,
-      worldBounds.lower + vec3(voxelID) * voxelExtend + voxelExtend);
+  // Field voxel range covered by this macrocell, with 1-voxel margin
+  // to account for trilinear interpolation across macrocell boundaries
+  const vec3 normLo = vec3(mcID) / vec3(mcDims);
+  const vec3 normHi = vec3(mcID + ivec3(1)) / vec3(mcDims);
+  const ivec3 voxelLo = glm::max(
+      ivec3(0), ivec3(glm::floor(normLo * vec3(fieldDims))) - ivec3(1));
+  const ivec3 voxelHi = glm::min(
+      fieldDims - ivec3(1), ivec3(glm::ceil(normHi * vec3(fieldDims))));
 
-  // compute the max value of all the cells that can
-  // overlap this voxel; splat out the _max_ over the
-  // overlapping MCs. (that's essentially a box filter)
-  vec3 tcs[8] = {(vec3(voxelID) + vec3(-.5f, -.5f, -.5f)) / vec3(dims),
-      (vec3(voxelID) + vec3(+.5f, -.5f, -.5f)) / vec3(dims),
-      (vec3(voxelID) + vec3(+.5f, +.5f, -.5f)) / vec3(dims),
-      (vec3(voxelID) + vec3(-.5f, +.5f, -.5f)) / vec3(dims),
-      (vec3(voxelID) + vec3(-.5f, -.5f, +.5f)) / vec3(dims),
-      (vec3(voxelID) + vec3(+.5f, -.5f, +.5f)) / vec3(dims),
-      (vec3(voxelID) + vec3(+.5f, +.5f, +.5f)) / vec3(dims),
-      (vec3(voxelID) + vec3(-.5f, +.5f, +.5f)) / vec3(dims)};
+  float lo = std::numeric_limits<float>::infinity();
+  float hi = -std::numeric_limits<float>::infinity();
 
-  float voxelValue = -1e30f;
-  for (int i = 0; i < 8; ++i) {
-    float retval = sampler(vec3(tcs[i].x, tcs[i].y, tcs[i].z));
-    voxelValue = fmaxf(voxelValue, retval);
-  }
-
-  // find out which MCs we overlap and splat the value out
-  // on the respective ranges
-  const ivec3 loMC = projectOnGrid(voxelBounds.lower, dims, worldBounds);
-  const ivec3 upMC = projectOnGrid(voxelBounds.upper, dims, worldBounds);
-
-  for (int mcz = loMC.z; mcz <= upMC.z; ++mcz) {
-    for (int mcy = loMC.y; mcy <= upMC.y; ++mcy) {
-      for (int mcx = loMC.x; mcx <= upMC.x; ++mcx) {
-        const ivec3 mcID(mcx, mcy, mcz);
-#ifdef __CUDA_ARCH__
-        atomicMinf(&valueRanges[linearIndex(mcID, dims)].lower, voxelValue);
-        atomicMaxf(&valueRanges[linearIndex(mcID, dims)].upper, voxelValue);
-#endif
+  for (int iz = voxelLo.z; iz <= voxelHi.z; ++iz) {
+    for (int iy = voxelLo.y; iy <= voxelHi.y; ++iy) {
+      for (int ix = voxelLo.x; ix <= voxelHi.x; ++ix) {
+        float val = accessor(ix, iy, iz);
+        if (!isnan(val) && !isinf(val)) {
+          lo = fminf(lo, val);
+          hi = fmaxf(hi, val);
+        }
       }
     }
   }
+
+  if (lo <= hi) {
+    valueRanges[threadID].lower = lo;
+    valueRanges[threadID].upper = hi;
+  } else {
+    valueRanges[threadID].lower = std::numeric_limits<float>::infinity();
+    valueRanges[threadID].upper = -std::numeric_limits<float>::infinity();
+  }
+}
+
+size_t UniformGrid::numCells() const
+{
+  return m_dims.x * size_t(m_dims.y) * m_dims.z;
 }
 
 void UniformGrid::init(ivec3 dims, box3 worldBounds)
 {
-  m_dims = ivec3(iDivUp(dims.x, 16), iDivUp(dims.y, 16), iDivUp(dims.z, 16));
+  m_fieldDims = dims;
+  m_dims = ivec3(iDivUp(dims.x, MACROCELL_SIZE),
+      iDivUp(dims.y, MACROCELL_SIZE),
+      iDivUp(dims.z, MACROCELL_SIZE));
   m_worldBounds = worldBounds;
 
-  size_t numMCs = m_dims.x * size_t(m_dims.y) * m_dims.z;
+  size_t n = numCells();
 
   cudaFree(m_valueRanges);
   cudaFree(m_maxOpacities);
 
-  cudaMalloc(&m_valueRanges, numMCs * sizeof(box1));
-  cudaMalloc(&m_maxOpacities, numMCs * sizeof(float));
-
-  size_t numThreads = 1024;
-  invalidateRangesGPU<<<(uint32_t)iDivUp(numMCs, numThreads),
-      (uint32_t)numThreads>>>(m_valueRanges, m_dims);
+  cudaMalloc(&m_valueRanges, n * sizeof(box1));
+  cudaMalloc(&m_maxOpacities, n * sizeof(float));
 }
 
-void UniformGrid::buildGrid(const SpatialFieldGPUData &sfgd)
+void UniformGrid::computeValueRanges(const SpatialFieldGPUData &sfgd)
 {
-  size_t numVoxels = size_t(m_dims.x) * m_dims.y * m_dims.z;
+  size_t numMCs = numCells();
   size_t numThreads = 1024;
 
-  // We ned to get the spatialfield gpu data upload, but we don't get
-  // to access the framedata store.
-  // Let's do a temporary upload so we can do the job.
+  // Temporary device upload — we don't have access to the framedata store
   SpatialFieldGPUData *sfgdDevice = {};
   cudaMalloc(&sfgdDevice, sizeof(sfgd));
   cudaMemcpy(sfgdDevice, &sfgd, sizeof(sfgd), cudaMemcpyHostToDevice);
 
+#define LAUNCH_BUILD_GRID(Accessor)                                            \
+  computeValueRangesGPU<Accessor><<<iDivUp(numMCs, numThreads), numThreads>>>( \
+      m_valueRanges, m_dims, m_fieldDims, sfgdDevice)
+
   switch (sfgd.samplerCallableIndex) {
-  case SbtCallableEntryPoints::SpatialFieldSamplerRegular: {
-    buildGridGPU<SpatialFieldSampler<cudaTextureObject_t>>
-        <<<iDivUp(numVoxels, numThreads), numThreads>>>(
-            m_valueRanges, m_dims, m_worldBounds, sfgdDevice);
+  case SbtCallableEntryPoints::SpatialFieldSamplerRegular:
+    LAUNCH_BUILD_GRID(SpatialFieldAccessor<cudaTextureObject_t>);
     break;
-  }
-  case SbtCallableEntryPoints::SpatialFieldSamplerNvdbFp4: {
-    buildGridGPU<NvdbSpatialFieldSampler<nanovdb::Fp4>>
-        <<<iDivUp(numVoxels, numThreads), numThreads>>>(
-            m_valueRanges, m_dims, m_worldBounds, sfgdDevice);
+  case SbtCallableEntryPoints::SpatialFieldSamplerNvdbFp4:
+    LAUNCH_BUILD_GRID(NvdbSpatialFieldAccessor<nanovdb::Fp4>);
     break;
-  }
-  case SbtCallableEntryPoints::SpatialFieldSamplerNvdbFp8: {
-    buildGridGPU<NvdbSpatialFieldSampler<nanovdb::Fp8>>
-        <<<iDivUp(numVoxels, numThreads), numThreads>>>(
-            m_valueRanges, m_dims, m_worldBounds, sfgdDevice);
+  case SbtCallableEntryPoints::SpatialFieldSamplerNvdbFp8:
+    LAUNCH_BUILD_GRID(NvdbSpatialFieldAccessor<nanovdb::Fp8>);
     break;
-  }
-  case SbtCallableEntryPoints::SpatialFieldSamplerNvdbFp16: {
-    buildGridGPU<NvdbSpatialFieldSampler<nanovdb::Fp16>>
-        <<<iDivUp(numVoxels, numThreads), numThreads>>>(
-            m_valueRanges, m_dims, m_worldBounds, sfgdDevice);
+  case SbtCallableEntryPoints::SpatialFieldSamplerNvdbFp16:
+    LAUNCH_BUILD_GRID(NvdbSpatialFieldAccessor<nanovdb::Fp16>);
     break;
-  }
-  case SbtCallableEntryPoints::SpatialFieldSamplerNvdbFpN: {
-    buildGridGPU<NvdbSpatialFieldSampler<nanovdb::FpN>>
-        <<<iDivUp(numVoxels, numThreads), numThreads>>>(
-            m_valueRanges, m_dims, m_worldBounds, sfgdDevice);
+  case SbtCallableEntryPoints::SpatialFieldSamplerNvdbFpN:
+    LAUNCH_BUILD_GRID(NvdbSpatialFieldAccessor<nanovdb::FpN>);
     break;
-  }
-  case SbtCallableEntryPoints::SpatialFieldSamplerNvdbFloat: {
-    buildGridGPU<NvdbSpatialFieldSampler<float>>
-        <<<iDivUp(numVoxels, numThreads), numThreads>>>(
-            m_valueRanges, m_dims, m_worldBounds, sfgdDevice);
+  case SbtCallableEntryPoints::SpatialFieldSamplerNvdbFloat:
+    LAUNCH_BUILD_GRID(NvdbSpatialFieldAccessor<float>);
     break;
-  }
+  case SbtCallableEntryPoints::SpatialFieldSamplerRectilinear:
+    LAUNCH_BUILD_GRID(StructuredRectilinearAccessor);
+    break;
+  case SbtCallableEntryPoints::SpatialFieldSamplerNvdbRectilinearFp4:
+    LAUNCH_BUILD_GRID(NvdbRectilinearSpatialFieldAccessor<nanovdb::Fp4>);
+    break;
+  case SbtCallableEntryPoints::SpatialFieldSamplerNvdbRectilinearFp8:
+    LAUNCH_BUILD_GRID(NvdbRectilinearSpatialFieldAccessor<nanovdb::Fp8>);
+    break;
+  case SbtCallableEntryPoints::SpatialFieldSamplerNvdbRectilinearFp16:
+    LAUNCH_BUILD_GRID(NvdbRectilinearSpatialFieldAccessor<nanovdb::Fp16>);
+    break;
+  case SbtCallableEntryPoints::SpatialFieldSamplerNvdbRectilinearFpN:
+    LAUNCH_BUILD_GRID(NvdbRectilinearSpatialFieldAccessor<nanovdb::FpN>);
+    break;
+  case SbtCallableEntryPoints::SpatialFieldSamplerNvdbRectilinearFloat:
+    LAUNCH_BUILD_GRID(NvdbRectilinearSpatialFieldAccessor<float>);
+    break;
   default:
     break;
   }
+
+#undef LAUNCH_BUILD_GRID
 
   cudaFree(sfgdDevice);
 }
@@ -246,11 +240,10 @@ UniformGridData UniformGrid::gpuData() const
 void UniformGrid::computeMaxOpacities(
     CUstream stream, cudaTextureObject_t cm, size_t cmSize, box1 cmRange)
 {
-  size_t numMCs = m_dims.x * size_t(m_dims.y) * m_dims.z;
-
+  size_t n = numCells();
   size_t numThreads = 1024;
-  computeMaxOpacitiesGPU<<<iDivUp(numMCs, numThreads), numThreads, 0, stream>>>(
-      m_maxOpacities, m_valueRanges, cm, numMCs, cmSize, cmRange);
+  computeMaxOpacitiesGPU<<<iDivUp(n, numThreads), numThreads, 0, stream>>>(
+      m_maxOpacities, m_valueRanges, cm, n, cmSize, cmRange);
 }
 
 } // namespace visrtx

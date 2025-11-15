@@ -314,7 +314,7 @@ void StructuredRectilinearField::buildGrid()
   m_uniformGrid.init(ivec3(dims.x, dims.y, dims.z), bounds());
 
   size_t numVoxels = (dims.x - 1) * size_t(dims.y - 1) * (dims.z - 1);
-  m_uniformGrid.buildGrid(gpuData());
+  m_uniformGrid.computeValueRanges(gpuData());
 }
 
 } // namespace visrtx

@@ -36,11 +36,13 @@
 
 namespace visrtx {
 
+constexpr int MACROCELL_SIZE = 16;
+
 struct UniformGrid
 {
   void init(ivec3 dims, box3 worldBounds);
 
-  void buildGrid(const SpatialFieldGPUData &sfgd);
+  void computeValueRanges(const SpatialFieldGPUData &sfgd);
 
   void cleanup();
   UniformGridData gpuData() const;
@@ -49,16 +51,12 @@ struct UniformGrid
       size_t cmSize,
       box1 cmRange = {0.f, 1.f});
 
-  // min/max value ranges
+  size_t numCells() const;
+
   box1 *m_valueRanges = nullptr;
-
-  // Majorants/max opacities
   float *m_maxOpacities = nullptr;
-
-  // Number of MCs
   ivec3 m_dims;
-
-  // World bounds the grid spans
+  ivec3 m_fieldDims;
   box3 m_worldBounds;
 };
 
