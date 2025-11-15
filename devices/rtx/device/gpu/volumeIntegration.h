@@ -31,10 +31,10 @@
 
 #pragma once
 
-#include "gpu/dda.h"
 #include "gpu/gpu_decl.h"
 #include "gpu/gpu_objects.h"
 #include "gpu/gpu_util.h"
+#include "gpu/gridTraversal.h"
 #include "gpu/shadingState.h"
 
 // cuda
@@ -108,6 +108,17 @@ VISRTX_DEVICE vec4 classifySample(const VolumeGPUData &v, float s)
   }
   return retval;
 }
+
+VISRTX_DEVICE float opacityToExtinction(
+    float opacity, float oneOverUnitDistance)
+{
+  constexpr float OPACITY_EPSILON = 1e-7f;
+  const float clampedOpacity = glm::clamp(opacity, 0.f, 0.9999f);
+  if (clampedOpacity <= OPACITY_EPSILON || !(oneOverUnitDistance > 0.f))
+    return 0.f;
+  return -logf(1.f - clampedOpacity) * oneOverUnitDistance;
+}
+
 
 VISRTX_DEVICE float _rayMarchVolume(ScreenSample &ss,
     const VolumeHit &hit,
@@ -233,61 +244,51 @@ VISRTX_DEVICE float _sampleDistance(ScreenSample &ss,
   objRay.t.lower -= hit.localRay.t.lower;
   objRay.t.upper -= hit.localRay.t.lower;
 
-  auto woodcockFunc = [&](const int leafID, float t0, float t1) {
-    const float maxOpacity = field.grid.maxOpacities[leafID];
-    float t = t0;
-
-    constexpr float EPSILON = 1e-7f;
-    if (maxOpacity <= EPSILON)
-      return true; // Skip empty voxels
-
-    // Correct extinction from opacity: σ = -ln(1-α) / unitDistance
-    // The opacity α represents the probability of absorption over unitDistance,
-    // so transmittance T = 1-α = exp(-σ·unitDistance), giving σ = -ln(1-α)/d
-    // Clamp maxOpacity to avoid log(0) for fully opaque regions
-    const float clampedMaxOpacity = glm::min(maxOpacity, 0.9999f);
+  GridTraversal trav(objRay, field.grid.dims, field.grid.worldBounds);
+  while (trav.valid()) {
+    const float maxOpacity = field.grid.maxOpacities[trav.cellIndex];
     const float majorantExtinction =
-        -logf(1.f - clampedMaxOpacity) * svv.oneOverUnitDistance;
+        opacityToExtinction(maxOpacity, svv.oneOverUnitDistance);
 
-    while (t < t1) {
-      // Sample free-flight distance using majorant extinction
-      t += -logf(fmaxf(1e-10f, 1.f - curand_uniform(&ss.rs)))
-          / majorantExtinction;
+    if (majorantExtinction > 0.f) {
+      constexpr int MAX_WOODCOCK_STEPS_PER_CELL = 128;
+      int steps = 0;
+      float t = trav.tEntry;
+      while (t < trav.tExit) {
+        if (++steps > MAX_WOODCOCK_STEPS_PER_CELL)
+          break;
+        t += -logf(fmaxf(1e-10f, 1.f - curand_uniform(&ss.rs)))
+            / majorantExtinction;
 
-      if (t >= t1)
-        break; // We've left this voxel
+        if (t >= trav.tExit)
+          break;
 
-      // Evaluate actual extinction at the tentative collision point
-      const vec3 p = objRay.org + objRay.dir * t;
-      const float s = volumeSamplerSample(&samplerState, field, p);
+        const vec3 p = objRay.org + objRay.dir * t;
+        const float s = volumeSamplerSample(&samplerState, field, p);
 
-      if (!glm::isnan(s)) {
-        const vec4 co = detail::classifySample(volume, s);
-        // Correct extinction from opacity: σ = -ln(1-α) / unitDistance
-        const float clampedOpacity = glm::min(co.w, 0.9999f);
-        const float actualExtinction = (clampedOpacity > EPSILON)
-            ? -logf(1.f - clampedOpacity) * svv.oneOverUnitDistance
-            : 0.f;
-
-        // Acceptance test: P(accept) = σ_actual / σ_majorant
-        float u = curand_uniform(&ss.rs);
-        if (actualExtinction >= u * majorantExtinction) {
-          // Real collision - ray scattered
-          albedo = vec3(co);
-          extinction = actualExtinction;
-          tr = 0.f;
-          t_out =
-              t + hit.localRay.t.lower; // Convert back to original ray space
-          return false; // Stop DDA traversal
+        if (!glm::isnan(s)) {
+          const vec4 co = detail::classifySample(volume, s);
+          const float actualExtinction =
+              opacityToExtinction(co.w, svv.oneOverUnitDistance);
+          if (actualExtinction > 0.f
+              && actualExtinction
+                  >= curand_uniform(&ss.rs) * majorantExtinction) {
+            albedo = vec3(co);
+            extinction = actualExtinction;
+            tr = 0.f;
+            t_out =
+                t + hit.localRay.t.lower; // Convert back to original ray space
+            break;
+          }
         }
-        // Null collision - continue tracking
       }
     }
 
-    return true; // Continue DDA traversal to next voxel
-  };
+    if (tr < 1.f)
+      break;
+    trav.next();
+  }
 
-  dda3(objRay, field.grid.dims, field.grid.worldBounds, woodcockFunc);
   // If no scattering occurred, return the exit point
   return (tr > 0.5f) ? hit.localRay.t.upper : t_out;
 }
