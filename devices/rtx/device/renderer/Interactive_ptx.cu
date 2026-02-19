@@ -82,10 +82,8 @@ struct InteractiveShadingPolicy
     vec3 contrib = materialEvaluateEmission(shadingState, -ray.dir);
 
     // Handle ambient light contribution
-    if (rendererParams.ambientIntensity > 0.0f) {
-      contrib += rendererParams.ambientColor * rendererParams.ambientIntensity
-          * materialEvaluateTint(shadingState);
-    }
+    contrib += rendererParams.ambientColor * rendererParams.ambientIntensity
+        * materialEvaluateTint(shadingState);
 
     // Handle all lights contributions
     for (size_t i = 0; i < world.numLightInstances; i++) {
@@ -148,7 +146,8 @@ struct InteractiveShadingPolicy
 
         auto sampleDir = randomDir(ss.rs, bounceHit.Ns);
         auto cosineT = dot(bounceHit.Ns, sampleDir);
-        auto color = materialEvaluateTint(bounceShadingState) * cosineT;
+        auto color = materialEvaluateTint(bounceShadingState) * cosineT
+            * rendererParams.ambientColor * rendererParams.ambientIntensity;
         contrib += color * nextRay.contributionWeight;
       } else {
         // No hit, get background contribution directly (no surface to weight
