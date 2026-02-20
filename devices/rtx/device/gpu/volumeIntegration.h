@@ -132,7 +132,7 @@ VISRTX_DEVICE float _rayMarchVolume(ScreenSample &ss,
   const float localDirLen = glm::length(hit.localRay.dir);
   const float localStep = volume.stepSize * invSamplingRate;
   const float dt = localStep / localDirLen;
-  const float exponent = localStep * svv.oneOverUnitDistance;
+  const float exponent = dt * svv.oneOverUnitDistance;
 
   // Apply jitter to starting position to reduce banding artifacts
   // Still making sure we stay inside the volume
