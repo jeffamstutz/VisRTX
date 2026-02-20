@@ -151,7 +151,7 @@ VISRTX_DEVICE float _rayMarchVolume(ScreenSample &ss,
 
     const float s = volumeSamplerSample(&samplerState, field, p);
     if (!glm::isnan(s)) {
-      const vec4 co = detail::classifySample(volume, s);
+      const vec4 co = classifySample(volume, s);
 
       const float stepAlpha = 1.0f - glm::pow(1.0f - co.w, exponent);
       if (stepAlpha > 0.0f) {

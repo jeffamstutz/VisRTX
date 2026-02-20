@@ -83,11 +83,11 @@ VISRTX_DEVICE LightSample sampleDirectionalLight(
 }
 
 VISRTX_DEVICE LightSample samplePointLight(
-    const LightGPUData &ld, const mat4 &xfm, const Hit &hit)
+    const LightGPUData &ld, const mat4 &xfm, const vec3 &origin)
 {
   LightSample ls;
   // Calculate vector from hit point to light position
-  ls.dir = xfmPoint(xfm, ld.point.position) - hit.hitpoint;
+  ls.dir = xfmPoint(xfm, ld.point.position) - origin;
   ls.dist = length(ls.dir);
   ls.dir /= ls.dist;
   // Apply inverse square law: intensity falls off as 1/r²
@@ -100,7 +100,7 @@ VISRTX_DEVICE LightSample samplePointLight(
 }
 
 VISRTX_DEVICE LightSample sampleSphereLight(
-    const LightGPUData &ld, const mat4 &xfm, const Hit &hit, RandState &rs)
+    const LightGPUData &ld, const mat4 &xfm, const vec3 &origin, RandState &rs)
 {
   LightSample ls;
   auto u1 = curand_uniform(&rs);
@@ -119,7 +119,7 @@ VISRTX_DEVICE LightSample sampleSphereLight(
   // Scale by sphere radius to get point on sphere surface
   auto p = vec3(x, y, z) * ld.sphere.radius;
   auto worldSamplePos = xfmPoint(xfm, ld.sphere.position + p);
-  ls.dir = worldSamplePos - hit.hitpoint;
+  ls.dir = worldSamplePos - origin;
   ls.dist = length(ls.dir);
   ls.dir /= ls.dist;
 
@@ -151,7 +151,7 @@ VISRTX_DEVICE LightSample sampleSphereLight(
 }
 
 VISRTX_DEVICE LightSample sampleRectLight(
-    const LightGPUData &ld, const mat4 &xfm, const Hit &hit, RandState &rs)
+    const LightGPUData &ld, const mat4 &xfm, const vec3 &origin, RandState &rs)
 {
   LightSample ls;
   auto uv = vec2(curand_uniform(&rs), curand_uniform(&rs));
@@ -159,7 +159,7 @@ VISRTX_DEVICE LightSample sampleRectLight(
   // Uniform sampling on rectangle: uv ∈ [0,1]² maps to rectangle
   auto rectangleSample = ld.rect.edge1 * uv.x + ld.rect.edge2 * uv.y;
   auto worldPos = xfmPoint(xfm, ld.rect.position + rectangleSample);
-  ls.dir = worldPos - hit.hitpoint;
+  ls.dir = worldPos - origin;
   ls.dist = length(ls.dir);
   ls.dir /= ls.dist;
 
@@ -198,7 +198,7 @@ VISRTX_DEVICE LightSample sampleRectLight(
 }
 
 VISRTX_DEVICE LightSample sampleRingLight(
-    const LightGPUData &ld, const mat4 &xfm, const Hit &hit, RandState &rs)
+    const LightGPUData &ld, const mat4 &xfm, const vec3 &origin, RandState &rs)
 {
   LightSample ls;
   auto u1 = curand_uniform(&rs);
@@ -223,7 +223,7 @@ VISRTX_DEVICE LightSample sampleRingLight(
   auto samplePos = basis[0] * localX + basis[1] * localY;
 
   // Calculate direction and distance to light sample point
-  ls.dir = xfmPoint(xfm, ld.ring.position + samplePos) - hit.hitpoint;
+  ls.dir = xfmPoint(xfm, ld.ring.position + samplePos) - origin;
   ls.dist = length(ls.dir);
   ls.dir /= ls.dist;
 
@@ -268,11 +268,11 @@ VISRTX_DEVICE LightSample sampleRingLight(
 }
 
 VISRTX_DEVICE LightSample sampleSpotLight(
-    const LightGPUData &ld, const mat4 &xfm, const Hit &hit)
+    const LightGPUData &ld, const mat4 &xfm, const vec3 &origin)
 {
   LightSample ls;
   // Calculate direction from light to hit point
-  ls.dir = xfmPoint(xfm, ld.spot.position) - hit.hitpoint;
+  ls.dir = xfmPoint(xfm, ld.spot.position) - origin;
   ls.dist = length(ls.dir);
   ls.dir /= ls.dist;
 
@@ -334,7 +334,7 @@ VISRTX_DEVICE LightSample sampleHDRILight(
 }
 
 VISRTX_DEVICE LightSample sampleHDRILight(
-    const LightGPUData &ld, const mat4 &xfm, const Hit &hit, RandState &rs)
+    const LightGPUData &ld, const mat4 &xfm, RandState &rs)
 {
   // Importance sampling using hierarchical (marginal/conditional) CDF approach
   // First sample row (y) using marginal CDF, then column (x) using conditional CDF
@@ -378,8 +378,10 @@ VISRTX_DEVICE LightSample sampleHDRILight(
 
 } // namespace detail
 
-VISRTX_DEVICE LightSample sampleLight(
-    ScreenSample &ss, const Hit &hit, DeviceObjectIndex idx, const mat4 &xfm)
+VISRTX_DEVICE LightSample sampleLight(ScreenSample &ss,
+    const vec3 &origin,
+    DeviceObjectIndex idx,
+    const mat4 &xfm)
 {
   auto &ld = ss.frameData->registry.lights[idx];
 
@@ -387,17 +389,17 @@ VISRTX_DEVICE LightSample sampleLight(
   case LightType::DIRECTIONAL:
     return detail::sampleDirectionalLight(ld, xfm);
   case LightType::POINT:
-    return detail::samplePointLight(ld, xfm, hit);
+    return detail::samplePointLight(ld, xfm, origin);
   case LightType::SPHERE:
-    return detail::sampleSphereLight(ld, xfm, hit, ss.rs);
+    return detail::sampleSphereLight(ld, xfm, origin, ss.rs);
   case LightType::RECT:
-    return detail::sampleRectLight(ld, xfm, hit, ss.rs);
+    return detail::sampleRectLight(ld, xfm, origin, ss.rs);
   case LightType::SPOT:
-    return detail::sampleSpotLight(ld, xfm, hit);
+    return detail::sampleSpotLight(ld, xfm, origin);
   case LightType::RING:
-    return detail::sampleRingLight(ld, xfm, hit, ss.rs);
+    return detail::sampleRingLight(ld, xfm, origin, ss.rs);
   case LightType::HDRI:
-    return detail::sampleHDRILight(ld, xfm, hit, ss.rs);
+    return detail::sampleHDRILight(ld, xfm, ss.rs);
   default:
     break;
   }

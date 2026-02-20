@@ -89,7 +89,7 @@ struct InteractiveShadingPolicy
     for (size_t i = 0; i < world.numLightInstances; i++) {
       const auto &light = world.lightInstances[i];
       const auto lightSample =
-          sampleLight(ss, hit, light.lightIndex, light.xfm);
+          sampleLight(ss, hit.hitpoint, light.lightIndex, light.xfm);
 
       if (lightSample.pdf == 0.0f)
         continue;
