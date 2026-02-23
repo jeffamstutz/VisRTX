@@ -24,6 +24,7 @@ struct Animation;
 namespace tsd::app {
 
 using CameraPose = tsd::rendering::CameraPose;
+using DeviceInitParam = std::pair<std::string, tsd::core::Any>;
 
 struct CommandLineOptions
 {
@@ -36,6 +37,7 @@ struct CommandLineOptions
   tsd::io::ImportAnimationFiles *currentAnimationSequence{nullptr};
   tsd::io::ImporterType importerType{tsd::io::ImporterType::NONE};
   std::string cameraFile;
+  std::vector<std::string> ensightFields;
 };
 
 struct TSDState

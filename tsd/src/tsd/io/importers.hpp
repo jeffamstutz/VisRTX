@@ -22,6 +22,10 @@ void import_ASSIMP(Scene &scene, const char *filename, LayerNodeRef location = {
 void import_AXYZ(Scene &scene, const char *filename, LayerNodeRef location = {});
 void import_DLAF(Scene &scene, const char *filename, LayerNodeRef location = {}, bool useDefaultMaterial = false);
 void import_E57XYZ(Scene &scene, const char *filename, LayerNodeRef location = {});
+void import_ENSIGHT(Scene &scene,
+    const char *filename,
+    LayerNodeRef location = {},
+    const std::vector<std::string> &fields = {});
 void import_GLTF(Scene &scene, const char *filename, LayerNodeRef location = {});
 void import_HDRI(Scene &scene, const char *filename, LayerNodeRef location = {});
 void import_HSMESH(Scene &scene, const char *filename, LayerNodeRef location = {});
@@ -76,6 +80,7 @@ enum class ImporterType
   AXYZ,
   DLAF,
   E57XYZ,
+  ENSIGHT,
   GLTF,
   HDRI,
   HSMESH,

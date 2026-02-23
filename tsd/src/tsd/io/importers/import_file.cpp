@@ -51,6 +51,8 @@ void import_file(Scene &scene,
     tsd::io::import_DLAF(scene, file.c_str(), root);
   else if (f.first == ImporterType::E57XYZ)
     tsd::io::import_E57XYZ(scene, file.c_str(), root);
+  else if (f.first == ImporterType::ENSIGHT)
+    tsd::io::import_ENSIGHT(scene, file.c_str(), root);
   else if (f.first == ImporterType::GLTF)
     tsd::io::import_GLTF(scene, file.c_str(), root);
   else if (f.first == ImporterType::HDRI)

@@ -8,6 +8,7 @@
 #include "tsd/core/ColorMapUtil.hpp"
 #include "tsd/core/Logging.hpp"
 // tsd_io
+#include "tsd/io/importers/detail/importer_common.hpp"
 #include "tsd/io/procedural.hpp"
 #include "tsd/io/serialization.hpp"
 
@@ -58,6 +59,15 @@ void Core::parseCommandLine(std::vector<std::string> &args)
       importerType = tsd::io::ImporterType::DLAF;
     else if (arg == "-e57xyz")
       importerType = tsd::io::ImporterType::E57XYZ;
+    else if (arg == "-ensight")
+      importerType = tsd::io::ImporterType::ENSIGHT;
+    else if (arg == "-ensight_fields") {
+      this->commandLine.ensightFields.clear();
+      auto tokens = tsd::io::splitString(args[++i], ',');
+      for (auto &t : tokens)
+        if (!t.empty())
+          this->commandLine.ensightFields.push_back(t);
+    }
     else if (arg == "-gltf")
       importerType = tsd::io::ImporterType::GLTF;
     else if (arg == "-hdri")
