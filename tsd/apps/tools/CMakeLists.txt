@@ -35,3 +35,14 @@ if(TSD_USE_LUA)
     tsd_ext_sol2
   )
 endif()
+
+project(tsdOffline)
+project_add_executable(tsdOffline.cpp)
+project_link_libraries(
+  tsd_app
+  tsd_core
+  tsd_io
+  tsd_rendering
+  tsd_ext_tinyexr_impl
+  stb_image
+)
