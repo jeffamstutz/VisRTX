@@ -100,6 +100,9 @@ cudaArray_t Array1D::acquireCUDAArrayFloat()
 
 void Array1D::releaseCUDAArrayFloat()
 {
+  if (m_arrayRefCountFloat == 0)
+    return;
+
   m_arrayRefCountFloat--;
   if (m_arrayRefCountFloat == 0) {
     cudaFreeArray(m_cuArrayFloat);
@@ -117,6 +120,9 @@ cudaArray_t Array1D::acquireCUDAArrayUint8()
 
 void Array1D::releaseCUDAArrayUint8()
 {
+  if (m_arrayRefCountUint8 == 0)
+    return;
+
   m_arrayRefCountUint8--;
   if (m_arrayRefCountUint8 == 0) {
     cudaFreeArray(m_cuArrayUint8);

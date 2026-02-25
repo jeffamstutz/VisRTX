@@ -48,22 +48,18 @@ struct Image2D : public Sampler
 
   int numChannels() const override;
 
-  // Public accessor for texture object (used by custom fields)
-  cudaTextureObject_t textureObject() const
-  {
-    return m_texture;
-  }
+  cudaTextureObject_t textureObject() const;
 
  private:
   SamplerGPUData gpuData() const override;
 
-  void cleanup();
+  void cleanupImageCudaArray();
+  void cleanupImageTextureObjects();
 
   std::string m_filter;
   std::string m_wrap1;
   std::string m_wrap2;
   helium::ChangeObserverPtr<Array2D> m_image;
-  helium::TimeStamp m_imageLastUpdated{};
 
   cudaTextureObject_t m_texture{};
   cudaTextureObject_t m_texels{};

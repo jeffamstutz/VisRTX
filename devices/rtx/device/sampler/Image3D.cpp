@@ -41,7 +41,8 @@ Image3D::Image3D(DeviceGlobalState *d) : Sampler(d), m_image(this) {}
 
 Image3D::~Image3D()
 {
-  cleanup();
+  cleanupImageTextureObjects();
+  cleanupImageCudaArray();
 }
 
 void Image3D::commitParameters()
@@ -52,9 +53,10 @@ void Image3D::commitParameters()
   m_wrap2 = getParamString("wrapMode2", "clampToEdge");
   m_wrap3 = getParamString("wrapMode3", "clampToEdge");
   auto *oldImage = m_image.get();
-  m_image = getParamObject<Array3D>("image");
-  if (oldImage != m_image.get())
-    m_imageLastUpdated = {};
+  auto *newImage = getParamObject<Array3D>("image");
+  if (oldImage != newImage)
+    cleanupImageCudaArray();
+  m_image = newImage;
 }
 
 void Image3D::finalize()
@@ -65,6 +67,15 @@ void Image3D::finalize()
     return;
   }
 
+  cudaArray_t cuArray = {};
+  bool isFp = isFloat(m_image->elementType());
+  if (isFp)
+    cuArray = m_image->acquireCUDAArrayFloat();
+  else
+    cuArray = m_image->acquireCUDAArrayUint8();
+
+  cleanupImageTextureObjects();
+
   const ANARIDataType format = m_image->elementType();
   auto nc = numANARIChannels(format);
   if (nc == 0) {
@@ -74,24 +85,10 @@ void Image3D::finalize()
     return;
   }
 
-  auto imageDataModified = m_image->lastDataModified();
-  if (m_imageLastUpdated != imageDataModified) {
-    m_imageLastUpdated = imageDataModified;
-
-    cleanup();
-
-    cudaArray_t cuArray = {};
-    bool isFp = isFloat(m_image->elementType());
-    if (isFp) {
-      cuArray = m_image->acquireCUDAArrayFloat();
-    } else {
-      cuArray = m_image->acquireCUDAArrayUint8();
-    }
-    m_texture = makeCudaTextureObject3D(
-        cuArray, !isFp, m_filter, m_wrap1, m_wrap2, m_wrap3, m_borderColor);
-    m_texels = makeCudaTexelObject3D(
-        cuArray, !isFp, "nearest", m_wrap1, m_wrap2, m_wrap3, m_borderColor);
-  }
+  m_texture = makeCudaTextureObject3D(
+      cuArray, !isFp, m_filter, m_wrap1, m_wrap2, m_wrap3, m_borderColor);
+  m_texels = makeCudaTexelObject3D(
+      cuArray, !isFp, "nearest", m_wrap1, m_wrap2, m_wrap3, m_borderColor);
 
   upload();
 }
@@ -103,7 +100,8 @@ bool Image3D::isValid() const
 
 uvec3 Image3D::imageSize() const
 {
-  if (!m_image) return uvec3(0);
+  if (!m_image)
+    return uvec3(0);
   auto sz = m_image->size();
   return uvec3(sz.x, sz.y, sz.z);
 }
@@ -112,6 +110,16 @@ int Image3D::numChannels() const
 {
   ANARIDataType format = m_image->elementType();
   return numANARIChannels(format);
+}
+
+cudaTextureObject_t Image3D::textureObject() const
+{
+  return m_texture;
+}
+
+Array3D *Image3D::image() const
+{
+  return m_image.get();
 }
 
 SamplerGPUData Image3D::gpuData() const
@@ -128,17 +136,23 @@ SamplerGPUData Image3D::gpuData() const
   return retval;
 }
 
-void Image3D::cleanup()
+void Image3D::cleanupImageCudaArray()
 {
-  if (m_image && m_texture) {
-    cudaDestroyTextureObject(m_texels);
-    cudaDestroyTextureObject(m_texture);
-    if (isFloat(m_image->elementType())) {
-      m_image->releaseCUDAArrayFloat();
-    } else {
-      m_image->releaseCUDAArrayUint8();
-    }
-  }
+  if (!m_image)
+    return;
+
+  if (isFloat(m_image->elementType()))
+    m_image->releaseCUDAArrayFloat();
+  else
+    m_image->releaseCUDAArrayUint8();
+}
+
+void Image3D::cleanupImageTextureObjects()
+{
+  cudaDestroyTextureObject(m_texels);
+  cudaDestroyTextureObject(m_texture);
+  m_texels = {};
+  m_texture = {};
 }
 
 } // namespace visrtx
