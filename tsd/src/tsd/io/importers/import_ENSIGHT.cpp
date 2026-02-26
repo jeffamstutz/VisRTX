@@ -371,8 +371,9 @@ static bool parseCase(const std::string &path, EnsightCaseData &out)
       return "";
     std::string s(buf);
     while (!s.empty()
-        && (s.back() == '\n' || s.back() == '\r' || s.back() == ' '))
+        && (s.back() == '\n' || s.back() == '\r' || s.back() == ' ')) {
       s.pop_back();
+    }
     size_t p = s.find_first_not_of(" \t");
     return p == std::string::npos ? "" : s.substr(p);
   };
@@ -430,7 +431,8 @@ static bool parseCase(const std::string &path, EnsightCaseData &out)
     } else if (section == TIME) {
       if (line.size() > 16 && line.substr(0, 16) == "number of steps:")
         out.numSteps = std::stoi(line.substr(16));
-      else if (line.size() > 22 && line.substr(0, 22) == "filename start number:")
+      else if (line.size() > 22
+          && line.substr(0, 22) == "filename start number:")
         out.startNumber = std::stoi(line.substr(22));
       else if (line.size() > 19 && line.substr(0, 19) == "filename increment:")
         out.increment = std::stoi(line.substr(19));
@@ -469,8 +471,7 @@ static bool parseCase(const std::string &path, EnsightCaseData &out)
 
       // rest = "[timeset] varname filename"
       auto tokens = splitString(rest, ' ');
-      tokens.erase(
-          std::remove(tokens.begin(), tokens.end(), ""), tokens.end());
+      tokens.erase(std::remove(tokens.begin(), tokens.end(), ""), tokens.end());
       if (tokens.size() < 2)
         continue;
 
@@ -503,8 +504,9 @@ static bool readGeoFile(
   }
 
   if (readRecord80(f) != "C Binary") {
-    logError("[import_ENSIGHT] only binary EnSight Gold geometry files are "
-             "supported (got non-binary header)");
+    logError(
+        "[import_ENSIGHT] only binary EnSight Gold geometry files are "
+        "supported (got non-binary header)");
     std::fclose(f);
     return false;
   }
@@ -528,8 +530,7 @@ static bool readGeoFile(
 
   while (!token.empty()) {
     if (token != "part") {
-      logWarning(
-          "[import_ENSIGHT] expected 'part', got '%s'", token.c_str());
+      logWarning("[import_ENSIGHT] expected 'part', got '%s'", token.c_str());
       break;
     }
 
@@ -590,8 +591,7 @@ static bool readGeoFile(
         for (int e = 0; e < numElems; ++e) {
           for (int i = 1; i + 1 < nodeCounts[e]; ++i) {
             part.triIndices.push_back(static_cast<uint32_t>(conn[off] - 1));
-            part.triIndices.push_back(
-                static_cast<uint32_t>(conn[off + i] - 1));
+            part.triIndices.push_back(static_cast<uint32_t>(conn[off + i] - 1));
             part.triIndices.push_back(
                 static_cast<uint32_t>(conn[off + i + 1] - 1));
           }
@@ -610,8 +610,9 @@ static bool readGeoFile(
         for (auto n : faceNodeCounts)
           totalNodes += n;
         std::fseek(f, totalNodes * (int)sizeof(int32_t), SEEK_CUR);
-        logWarning("[import_ENSIGHT] part %d: nfaced elements not supported, "
-                   "skipping %d elements",
+        logWarning(
+            "[import_ENSIGHT] part %d: nfaced elements not supported, "
+            "skipping %d elements",
             partId,
             numElems);
       } else if (isVolumeElem(et)) {
@@ -623,8 +624,9 @@ static bool readGeoFile(
       } else {
         int npe = nodesPerElem(et);
         if (npe == 0) {
-          logWarning("[import_ENSIGHT] part %d: unknown element type '%s', "
-                     "skipping",
+          logWarning(
+              "[import_ENSIGHT] part %d: unknown element type '%s', "
+              "skipping",
               partId,
               token.c_str());
           token = lowerStr(readRecord80(f));
@@ -692,16 +694,16 @@ static void readVarFile(const std::string &filename,
     auto assocTag = lowerStr(readRecord80(f));
     if (assocTag != "coordinates") {
       // Cell-centered data: we cannot skip without knowing element counts.
-      logWarning("[import_ENSIGHT] cell-centered variable data for part %d "
-                 "not supported, stopping variable read",
+      logWarning(
+          "[import_ENSIGHT] cell-centered variable data for part %d "
+          "not supported, stopping variable read",
           partId);
       break;
     }
 
     auto it = byId.find(partId);
     if (it == byId.end()) {
-      logWarning(
-          "[import_ENSIGHT] var file: unknown part id %d", partId);
+      logWarning("[import_ENSIGHT] var file: unknown part id %d", partId);
       token = lowerStr(readRecord80(f));
       continue;
     }
@@ -746,11 +748,11 @@ void import_ENSIGHT(Scene &scene,
 
   logStatus("[import_ENSIGHT] loading '%s'", caseFile.c_str());
 
-  const std::string geoFile =
-      caseDir + expandPattern(caseData.geoPattern,
-                    caseData.startNumber,
-                    caseData.increment,
-                    caseData.numSteps)[0];
+  const std::string geoFile = caseDir
+      + expandPattern(caseData.geoPattern,
+          caseData.startNumber,
+          caseData.increment,
+          caseData.numSteps)[0];
 
   std::vector<EnsightPart> parts;
   if (!readGeoFile(geoFile, parts)) {
@@ -778,8 +780,9 @@ void import_ENSIGHT(Scene &scene,
       if (caseData.variables.count(f))
         varOrder.push_back(f);
       else
-        logWarning("[import_ENSIGHT] requested field '%s' not found in case "
-                   "file, skipping",
+        logWarning(
+            "[import_ENSIGHT] requested field '%s' not found in case "
+            "file, skipping",
             f.c_str());
   } else {
     for (const auto &[name, info] : caseData.variables) {
@@ -801,11 +804,11 @@ void import_ENSIGHT(Scene &scene,
       continue;
 
     int nc = (info.type == "vector") ? 3 : 1;
-    const std::string varFile =
-        caseDir + expandPattern(info.filenamePattern,
-                      caseData.startNumber,
-                      caseData.increment,
-                      caseData.numSteps)[0];
+    const std::string varFile = caseDir
+        + expandPattern(info.filenamePattern,
+            caseData.startNumber,
+            caseData.increment,
+            caseData.numSteps)[0];
 
     VarData vd;
     vd.numComponents = nc;
@@ -851,9 +854,10 @@ void import_ENSIGHT(Scene &scene,
     ArrayRef firstScalarArr;
     for (const auto &varName : varOrder) {
       if (attrSlot > 3) {
-        logWarning("[import_ENSIGHT] more than 4 fields requested; '%s' and "
-                   "subsequent fields exceed the ANARI attribute limit and will "
-                   "not be loaded",
+        logWarning(
+            "[import_ENSIGHT] more than 4 fields requested; '%s' and "
+            "subsequent fields exceed the ANARI attribute limit and will "
+            "not be loaded",
             varName.c_str());
         break;
       }
@@ -865,8 +869,7 @@ void import_ENSIGHT(Scene &scene,
       if (it == vd.perPart.end())
         continue;
       const auto &data = it->second;
-      const std::string param =
-          "vertex.attribute" + std::to_string(attrSlot);
+      const std::string param = "vertex.attribute" + std::to_string(attrSlot);
 
       if (vd.numComponents == 1) {
         if ((int)data.size() != numNodes)
@@ -881,26 +884,27 @@ void import_ENSIGHT(Scene &scene,
         if ((int)data.size() != numNodes * vd.numComponents)
           continue;
         if (attrSlot + 3 > 3) {
-          logWarning("[import_ENSIGHT] vector field '%s' needs 4 attribute "
-                     "slots starting at %d, which exceeds the ANARI limit; "
-                     "skipping",
+          logWarning(
+              "[import_ENSIGHT] vector field '%s' needs 4 attribute "
+              "slots starting at %d, which exceeds the ANARI limit; "
+              "skipping",
               varName.c_str(),
               attrSlot);
           continue;
         }
         auto magArr = scene.createArray(ANARI_FLOAT32, numNodes);
-        auto xArr   = scene.createArray(ANARI_FLOAT32, numNodes);
-        auto yArr   = scene.createArray(ANARI_FLOAT32, numNodes);
-        auto zArr   = scene.createArray(ANARI_FLOAT32, numNodes);
+        auto xArr = scene.createArray(ANARI_FLOAT32, numNodes);
+        auto yArr = scene.createArray(ANARI_FLOAT32, numNodes);
+        auto zArr = scene.createArray(ANARI_FLOAT32, numNodes);
         auto *mag = magArr->mapAs<float>();
-        auto *x   = xArr->mapAs<float>();
-        auto *y   = yArr->mapAs<float>();
-        auto *z   = zArr->mapAs<float>();
+        auto *x = xArr->mapAs<float>();
+        auto *y = yArr->mapAs<float>();
+        auto *z = zArr->mapAs<float>();
         for (int i = 0; i < numNodes; ++i) {
           float vx = data[i * 3], vy = data[i * 3 + 1], vz = data[i * 3 + 2];
-          x[i]   = vx;
-          y[i]   = vy;
-          z[i]   = vz;
+          x[i] = vx;
+          y[i] = vy;
+          z[i] = vz;
           mag[i] = std::sqrt(vx * vx + vy * vy + vz * vz);
         }
         magArr->unmap();
@@ -925,7 +929,8 @@ void import_ENSIGHT(Scene &scene,
     if (firstScalarArr) {
       mat = scene.createObject<Material>(tokens::material::physicallyBased);
       auto range = computeScalarRange(*firstScalarArr);
-      mat->setParameterObject("color", *makeDefaultColorMapSampler(scene, range));
+      mat->setParameterObject(
+          "baseColor", *makeDefaultColorMapSampler(scene, range));
     } else {
       mat = scene.defaultMaterial();
     }
@@ -935,8 +940,7 @@ void import_ENSIGHT(Scene &scene,
     (*nodeRef)->name() = partName;
   }
 
-  logStatus(
-      "[import_ENSIGHT] done, %zu part(s) loaded", parts.size());
+  logStatus("[import_ENSIGHT] done, %zu part(s) loaded", parts.size());
 }
 
 } // namespace tsd::io
