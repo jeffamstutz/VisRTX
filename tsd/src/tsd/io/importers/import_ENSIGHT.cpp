@@ -923,7 +923,7 @@ void import_ENSIGHT(Scene &scene,
     // Color-mapped material when a scalar field is present, otherwise default
     MaterialRef mat;
     if (firstScalarArr) {
-      mat = scene.createObject<Material>(tokens::material::matte);
+      mat = scene.createObject<Material>(tokens::material::physicallyBased);
       auto range = computeScalarRange(*firstScalarArr);
       mat->setParameterObject("color", *makeDefaultColorMapSampler(scene, range));
     } else {
