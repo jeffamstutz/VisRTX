@@ -23,6 +23,7 @@
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdGeom/cone.h>
 #include <pxr/usd/usdGeom/cylinder.h>
+#include <pxr/usd/usdGeom/basisCurves.h>
 #include <pxr/usd/usdGeom/mesh.h>
 #include <pxr/usd/usdGeom/points.h>
 #include <pxr/usd/usdGeom/primvarsAPI.h>
@@ -441,18 +442,20 @@ static void import_usd_mesh(Scene &scene,
 
   // Get vertex positions
   pxr::VtArray<pxr::GfVec3f> points;
-  mesh.GetPointsAttr().Get(&points);
+  mesh.GetPointsAttr().Get(&points, pxr::UsdTimeCode::EarliestTime());
 
   // Get face topology
   pxr::VtArray<int> faceVertexIndices;
-  mesh.GetFaceVertexIndicesAttr().Get(&faceVertexIndices);
+  mesh.GetFaceVertexIndicesAttr().Get(
+      &faceVertexIndices, pxr::UsdTimeCode::EarliestTime());
   pxr::VtArray<int> faceVertexCounts;
-  mesh.GetFaceVertexCountsAttr().Get(&faceVertexCounts);
+  mesh.GetFaceVertexCountsAttr().Get(
+      &faceVertexCounts, pxr::UsdTimeCode::EarliestTime());
 
   // Get normals and their interpolation
   pxr::VtArray<pxr::GfVec3f> normals;
   pxr::TfToken normalsInterpolation = pxr::UsdGeomTokens->vertex; // Default
-  mesh.GetNormalsAttr().Get(&normals);
+  mesh.GetNormalsAttr().Get(&normals, pxr::UsdTimeCode::EarliestTime());
   if (!normals.empty()) {
     normalsInterpolation = mesh.GetNormalsInterpolation();
   }
@@ -660,49 +663,205 @@ static void import_usd_mesh(Scene &scene,
   scene.insertChildObjectNode(parent, surface);
 }
 
-// Helper: Import a UsdGeomPoints prim as a TSD sphere geometry (point cloud)
+// Helper: Import a UsdGeomPoints prim as a TSD sphere geometry (point cloud),
+// with animation if the positions/widths are time-sampled.
 static void import_usd_points(Scene &scene,
     const pxr::UsdPrim &prim,
     LayerNodeRef parent,
     const pxr::GfMatrix4d &usdXform)
 {
   pxr::UsdGeomPoints pointsPrim(prim);
-  pxr::VtArray<pxr::GfVec3f> points;
-  pointsPrim.GetPointsAttr().Get(&points);
-  pxr::VtArray<float> widths;
-  pointsPrim.GetWidthsAttr().Get(&widths);
-
-  std::vector<float3> outPositions;
-  std::vector<float> outRadii;
-  for (size_t i = 0; i < points.size(); ++i) {
-    pxr::GfVec3f p = points[i];
-    pxr::GfVec4d p4(p[0], p[1], p[2], 1.0);
-    pxr::GfVec4d wp4 = usdXform * p4;
-    float3 wp{float(wp4[0]), float(wp4[1]), float(wp4[2])};
-    outPositions.push_back(wp);
-    float r = (widths.size() == points.size()) ? widths[i] * 0.5f : 0.01f;
-    outRadii.push_back(r);
-  }
-  auto geom = scene.createObject<Geometry>(tokens::geometry::sphere);
-  auto posArray = scene.createArray(ANARI_FLOAT32_VEC3, outPositions.size());
-  posArray->setData(outPositions.data(), outPositions.size());
-  auto radArray = scene.createArray(ANARI_FLOAT32, outRadii.size());
-  radArray->setData(outRadii.data(), outRadii.size());
-  geom->setParameterObject("vertex.position", *posArray);
-  geom->setParameterObject("vertex.radius", *radArray);
   std::string primName = prim.GetPath().GetString();
   if (primName.empty())
     primName = "<unnamed_points>";
+
+  std::vector<double> timeSamples;
+  pointsPrim.GetPointsAttr().GetTimeSamples(&timeSamples);
+
+  // Build position+radius arrays for one time step
+  auto buildFrame =
+      [&](pxr::UsdTimeCode tc) -> std::pair<ObjectUsePtr<Array>, ObjectUsePtr<Array>> {
+    pxr::VtArray<pxr::GfVec3f> pts;
+    pxr::VtArray<float> wids;
+    pointsPrim.GetPointsAttr().Get(&pts, tc);
+    pointsPrim.GetWidthsAttr().Get(&wids, tc);
+    std::vector<float3> outPos;
+    std::vector<float> outRad;
+    outPos.reserve(pts.size());
+    outRad.reserve(pts.size());
+    for (size_t i = 0; i < pts.size(); ++i) {
+      const auto &p = pts[i];
+      pxr::GfVec4d wp4 = usdXform * pxr::GfVec4d(p[0], p[1], p[2], 1.0);
+      outPos.push_back(float3(float(wp4[0]), float(wp4[1]), float(wp4[2])));
+      outRad.push_back((wids.size() == pts.size()) ? wids[i] * 0.5f : 0.01f);
+    }
+    auto pa = scene.createArray(ANARI_FLOAT32_VEC3, outPos.size());
+    pa->setData(outPos.data(), outPos.size());
+    auto ra = scene.createArray(ANARI_FLOAT32, outRad.size());
+    ra->setData(outRad.data(), outRad.size());
+    return {pa, ra};
+  };
+
+  pxr::UsdTimeCode firstTC = timeSamples.empty()
+      ? pxr::UsdTimeCode::EarliestTime()
+      : pxr::UsdTimeCode(timeSamples[0]);
+
+  auto [firstPosArray, firstRadArray] = buildFrame(firstTC);
+  if (!firstPosArray || firstPosArray->size() == 0) {
+    logStatus("[import_USD] Skipping Points prim with no point data: %s\n",
+        primName.c_str());
+    return;
+  }
+
+  auto geom = scene.createObject<Geometry>(tokens::geometry::sphere);
   geom->setName(primName.c_str());
+  geom->setParameterObject("vertex.position", *firstPosArray);
+  geom->setParameterObject("vertex.radius", *firstRadArray);
 
-  // Material binding
   MaterialRef mat = get_bound_material(scene, prim, "");
-
   auto surface = scene.createSurface(primName.c_str(), geom, mat);
-  logStatus("[import_USD] Assigned material to sphere '%s': %s\n",
-      primName.c_str(),
-      mat->name().c_str());
   scene.insertChildObjectNode(parent, surface);
+
+  logStatus("[import_USD] Imported Points '%s' (%zu pts, %zu frames)\n",
+      primName.c_str(),
+      firstPosArray->size(),
+      timeSamples.empty() ? size_t(1) : timeSamples.size());
+
+  // Build animation if there are multiple time samples
+  if (timeSamples.size() > 1) {
+    std::vector<ObjectUsePtr<Array>> posArrays, radArrays;
+    posArrays.push_back(firstPosArray);
+    radArrays.push_back(firstRadArray);
+    for (size_t ti = 1; ti < timeSamples.size(); ++ti) {
+      auto [pa, ra] = buildFrame(pxr::UsdTimeCode(timeSamples[ti]));
+      if (pa && pa->size() > 0) {
+        posArrays.push_back(pa);
+        radArrays.push_back(ra);
+      }
+    }
+    if (posArrays.size() > 1) {
+      auto *anim = scene.addAnimation(primName.c_str());
+      anim->setAsTimeSteps(*geom,
+          std::vector<Token>{"vertex.position", "vertex.radius"},
+          std::vector<TimeStepArrays>{posArrays, radArrays});
+    }
+  }
+}
+
+// Helper: Import a UsdGeomBasisCurves prim as TSD curve geometry,
+// with animation if the positions are time-sampled.
+static void import_usd_curves(Scene &scene,
+    const pxr::UsdPrim &prim,
+    LayerNodeRef parent,
+    const pxr::GfMatrix4d &usdXform)
+{
+  pxr::UsdGeomBasisCurves curvesPrim(prim);
+  std::string primName = prim.GetPath().GetString();
+  if (primName.empty())
+    primName = "<unnamed_curves>";
+
+  // Curve topology is static (curveVertexCounts doesn't animate).
+  // Use EarliestTime() to handle attributes stored at time samples but not
+  // at default time.
+  pxr::VtArray<int> curveVertexCounts;
+  curvesPrim.GetCurveVertexCountsAttr().Get(
+      &curveVertexCounts, pxr::UsdTimeCode::EarliestTime());
+  if (curveVertexCounts.empty()) {
+    logStatus("[import_USD] Skipping BasisCurves with no vertex counts: %s\n",
+        primName.c_str());
+    return;
+  }
+
+  // Build primitive.index: for each curve of N vertices, emit N-1 segment
+  // start indices, leaving a gap between curves so they stay separate.
+  std::vector<uint32_t> segIndices;
+  {
+    uint32_t base = 0;
+    for (int count : curveVertexCounts) {
+      for (int i = 0; i < count - 1; ++i)
+        segIndices.push_back(base + uint32_t(i));
+      base += uint32_t(count);
+    }
+  }
+  if (segIndices.empty()) {
+    logStatus("[import_USD] Skipping BasisCurves with no segments: %s\n",
+        primName.c_str());
+    return;
+  }
+
+  // Build a position array for one time step
+  auto buildFrame = [&](pxr::UsdTimeCode tc) -> ObjectUsePtr<Array> {
+    pxr::VtArray<pxr::GfVec3f> pts;
+    curvesPrim.GetPointsAttr().Get(&pts, tc);
+    if (pts.empty())
+      return {};
+    std::vector<float3> outPts;
+    outPts.reserve(pts.size());
+    for (const auto &p : pts) {
+      pxr::GfVec4d wp4 = usdXform * pxr::GfVec4d(p[0], p[1], p[2], 1.0);
+      outPts.push_back(float3(float(wp4[0]), float(wp4[1]), float(wp4[2])));
+    }
+    auto arr = scene.createArray(ANARI_FLOAT32_VEC3, outPts.size());
+    arr->setData(outPts.data(), outPts.size());
+    return arr;
+  };
+
+  std::vector<double> timeSamples;
+  curvesPrim.GetPointsAttr().GetTimeSamples(&timeSamples);
+
+  pxr::UsdTimeCode firstTC = timeSamples.empty()
+      ? pxr::UsdTimeCode::EarliestTime()
+      : pxr::UsdTimeCode(timeSamples[0]);
+
+  auto firstPosArray = buildFrame(firstTC);
+  if (!firstPosArray) {
+    logStatus("[import_USD] Skipping BasisCurves with no point data: %s\n",
+        primName.c_str());
+    return;
+  }
+
+  // Build a per-vertex radius array (barney's Curve::bounds() unconditionally
+  // dereferences vertex.radius, so we must always supply it even when using a
+  // uniform radius).
+  const float kCurveRadius = 0.3f;
+  std::vector<float> radii(firstPosArray->size(), kCurveRadius);
+  auto radArray = scene.createArray(ANARI_FLOAT32, radii.size());
+  radArray->setData(radii.data(), radii.size());
+
+  auto geom = scene.createObject<Geometry>(tokens::geometry::curve);
+  geom->setName(primName.c_str());
+  geom->setParameterObject("vertex.position", *firstPosArray);
+  geom->setParameterObject("vertex.radius", *radArray);
+
+  // barney's Curve::setBarneyParameters() also unconditionally dereferences
+  // primitive.index, so we must always supply it.
+  auto idxArray = scene.createArray(ANARI_UINT32, segIndices.size());
+  idxArray->setData(segIndices.data(), segIndices.size());
+  geom->setParameterObject("primitive.index", *idxArray);
+
+  MaterialRef mat = get_bound_material(scene, prim, "");
+  auto surface = scene.createSurface(primName.c_str(), geom, mat);
+  scene.insertChildObjectNode(parent, surface);
+
+  logStatus("[import_USD] Imported BasisCurves '%s' (%zu segs, %zu frames)\n",
+      primName.c_str(),
+      segIndices.size(),
+      timeSamples.empty() ? size_t(1) : timeSamples.size());
+
+  // Build animation if there are multiple time samples
+  if (timeSamples.size() > 1) {
+    std::vector<ObjectUsePtr<Array>> posArrays;
+    posArrays.push_back(firstPosArray);
+    for (size_t ti = 1; ti < timeSamples.size(); ++ti) {
+      auto arr = buildFrame(pxr::UsdTimeCode(timeSamples[ti]));
+      if (arr)
+        posArrays.push_back(arr);
+    }
+    if (posArrays.size() > 1) {
+      auto *anim = scene.addAnimation(primName.c_str());
+      anim->setAsTimeSteps(*geom, "vertex.position", posArrays);
+    }
+  }
 }
 
 // Helper: Import a UsdGeomSphere prim as a TSD sphere geometry
@@ -1061,6 +1220,17 @@ static void import_usd_dome_light(Scene &scene,
 
   light->setParameter("direction", direction);
   light->setParameter("up", up);
+
+  // Synthesize a 1x1 fallback radiance from solid color * intensity if no
+  // texture is provided (barney requires radiance to be set on HDRI lights).
+  {
+    float3 solidColor(color[0], color[1], color[2]);
+    solidColor *= intensity;
+    auto fallbackRadiance = scene.createArray(ANARI_FLOAT32_VEC3, 1, 1);
+    fallbackRadiance->setData(&solidColor);
+    light->setParameterObject("radiance", *fallbackRadiance);
+  }
+
   // Load and set environment texture from usdLight.GetTextureFileAttr()
   pxr::SdfAssetPath textureAsset;
   if (usdLight.GetTextureFileAttr().Get(&textureAsset)) {
@@ -1231,7 +1401,8 @@ static void import_usd_prim_recursive(Scene &scene,
   // Determine if this prim is a geometry or light
   bool isGeometry = prim.IsA<pxr::UsdGeomMesh>()
       || prim.IsA<pxr::UsdGeomPoints>() || prim.IsA<pxr::UsdGeomSphere>()
-      || prim.IsA<pxr::UsdGeomCone>() || prim.IsA<pxr::UsdGeomCylinder>();
+      || prim.IsA<pxr::UsdGeomCone>() || prim.IsA<pxr::UsdGeomCylinder>()
+      || prim.IsA<pxr::UsdGeomBasisCurves>();
   bool isVolume = prim.IsA<pxr::UsdVolVolume>();
   bool isLight = prim.IsA<pxr::UsdLuxDistantLight>()
       || prim.IsA<pxr::UsdLuxRectLight>() || prim.IsA<pxr::UsdLuxSphereLight>()
@@ -1278,6 +1449,8 @@ static void import_usd_prim_recursive(Scene &scene,
     import_usd_cone(scene, prim, thisNode, thisWorldXform);
   } else if (prim.IsA<pxr::UsdGeomCylinder>()) {
     import_usd_cylinder(scene, prim, thisNode, thisWorldXform);
+  } else if (prim.IsA<pxr::UsdGeomBasisCurves>()) {
+    import_usd_curves(scene, prim, thisNode, thisWorldXform);
   } else if (prim.IsA<pxr::UsdLuxDistantLight>()) {
     import_usd_distant_light(scene, prim, thisNode);
   } else if (prim.IsA<pxr::UsdLuxRectLight>()) {
