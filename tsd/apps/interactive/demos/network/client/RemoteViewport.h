@@ -47,14 +47,12 @@ struct RemoteViewport : public Window
 
   // Data /////////////////////////////////////////////////////////////////////
 
-  tsd::math::float2 m_previousMouse{-1.f, -1.f};
   bool m_wasConnected{false};
+
+  tsd::math::float2 m_previousMouse{-1.f, -1.f};
   bool m_mouseRotating{false};
   bool m_manipulating{false};
   bool m_showOverlay{true};
-  bool m_showCameraInfo{false};
-
-  float m_fov{40.f};
 
   std::vector<tsd::core::RendererAppRef> m_rendererObjects;
   tsd::core::RendererAppRef m_currentRenderer;
@@ -62,12 +60,9 @@ struct RemoteViewport : public Window
 
   // Camera manipulator //
 
-  int m_arcballUp{1};
   tsd::rendering::Manipulator m_localArcball;
   tsd::rendering::Manipulator *m_arcball{nullptr};
   tsd::rendering::UpdateToken m_cameraToken{0};
-  float m_apertureRadius{0.f};
-  float m_focusDistance{1.f};
 
   // Networking //
 

@@ -255,7 +255,6 @@ void Viewport::saveSettings(tsd::core::DataNode &root)
   // Viewport settings //
 
   root["showOverlay"] = m_showOverlay;
-  root["showCameraInfo"] = m_showCameraInfo;
   root["showOnlySelected"] = m_showOnlySelected;
   root["highlightSelection"] = m_highlightSelection;
   root["showOnlySelected"] = m_showOnlySelected;
@@ -290,7 +289,6 @@ void Viewport::loadSettings(tsd::core::DataNode &root)
   // Viewport settings //
 
   root["showOverlay"].getValue(ANARI_BOOL, &m_showOverlay);
-  root["showCameraInfo"].getValue(ANARI_BOOL, &m_showCameraInfo);
   root["showOnlySelected"].getValue(ANARI_BOOL, &m_showOnlySelected);
   root["highlightSelection"].getValue(ANARI_BOOL, &m_highlightSelection);
   root["showOnlySelected"].getValue(ANARI_BOOL, &m_showOnlySelected);
@@ -687,8 +685,9 @@ void Viewport::ui_menubar_Camera()
     {
       ImGui::Indent(INDENT_AMOUNT);
 
-      if (ImGui::Combo("Up", &m_arcballUp, "+x\0+y\0+z\0-x\0-y\0-z\0\0")) {
-        m_arcball->setAxis(static_cast<tsd::rendering::UpAxis>(m_arcballUp));
+      auto axis = static_cast<int>(m_arcball->axis());
+      if (ImGui::Combo("Up", &axis, "+x\0+y\0+z\0-x\0-y\0-z\0\0")) {
+        m_arcball->setAxis(static_cast<tsd::rendering::UpAxis>(axis));
         resetView();
       }
 

@@ -22,8 +22,7 @@
 
 namespace tsd::ui::imgui {
 
-CameraPoses::CameraPoses(Application *app, Viewport *viewport, const char *name)
-    : Window(app, name), m_viewport(viewport)
+CameraPoses::CameraPoses(Application *app, const char *name) : Window(app, name)
 {}
 
 void CameraPoses::buildUI()

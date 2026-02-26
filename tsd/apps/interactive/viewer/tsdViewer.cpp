@@ -41,7 +41,7 @@ class Application : public TSDApplication
     auto *viewport2 =
         new tsd_ui::Viewport(this, &core->view.manipulator, "Secondary View");
     auto *animations = new tsd_ui::Animations(this);
-    auto *cameras = new tsd_ui::CameraPoses(this, viewport);
+    auto *cameras = new tsd_ui::CameraPoses(this);
     auto *log = new tsd_ui::Log(this);
     auto *dbeditor = new tsd_ui::DatabaseEditor(this);
     auto *oeditor = new tsd_ui::ObjectEditor(this);

@@ -307,32 +307,6 @@ void RemoteViewport::ui_overlay()
   if (ImGui::BeginChild(
           "##viewportOverlay", ImVec2(0, 0), childFlags, childWindowFlags)) {
     ImGui::Text("viewport: %i x %i", m_viewportSize.x, m_viewportSize.y);
-
-#if 0
-    ImGui::Text(" display: %.2fms", m_latestFL);
-    ImGui::Text("   ANARI: %.2fms", m_latestAnariFL);
-    ImGui::Text("   (min): %.2fms", m_minFL);
-    ImGui::Text("   (max): %.2fms", m_maxFL);
-#endif
-
-    ImGui::Separator();
-    ImGui::Checkbox("camera config", &m_showCameraInfo);
-    if (m_showCameraInfo) {
-      auto at = m_arcball->at();
-      auto azel = m_arcball->azel();
-      auto dist = m_arcball->distance();
-      auto fixedDist = m_arcball->fixedDistance();
-
-      bool update = ImGui::SliderFloat("az", &azel.x, 0.f, 360.f);
-      update |= ImGui::SliderFloat("el", &azel.y, 0.f, 360.f);
-      update |= ImGui::DragFloat("dist", &dist);
-      update |= ImGui::DragFloat3("at", &at.x);
-
-      if (update) {
-        m_arcball->setConfig(at, dist, azel);
-        m_arcball->setFixedDistance(fixedDist);
-      }
-    }
   }
   ImGui::EndChild();
 

@@ -20,7 +20,6 @@ struct Viewport;
 struct CameraPoses : public Window
 {
   CameraPoses(Application *app,
-      Viewport *viewport = nullptr,
       const char *name = "Camera Poses");
   void buildUI() override;
 
@@ -45,7 +44,6 @@ struct CameraPoses : public Window
   std::atomic<bool> m_hasNewPose{false};
   tsd::rendering::CameraPose m_currentPose;
   std::mutex m_poseMutex;
-  Viewport *m_viewport{nullptr};
 };
 
 } // namespace tsd::ui::imgui

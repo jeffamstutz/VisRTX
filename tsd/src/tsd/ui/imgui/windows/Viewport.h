@@ -91,16 +91,14 @@ struct Viewport : public Window
   tsd::math::float2 m_previousMouse{-1.f, -1.f};
   bool m_mouseRotating{false};
   bool m_manipulating{false};
-  bool m_frameCancelled{false};
 
   bool m_showOverlay{true};
-  bool m_showCameraInfo{false};
+  bool m_showAxes{true};
   bool m_highlightSelection{true};
   bool m_showOnlySelected{false};
   int m_frameSamples{0};
 
   tsd::rendering::AOVType m_visualizeAOV{tsd::rendering::AOVType::NONE};
-  bool m_showAxes{true};
   float m_depthVisualMinimum{0.f};
   float m_depthVisualMaximum{1.f};
   float m_edgeThreshold{0.5f};
@@ -128,7 +126,6 @@ struct Viewport : public Window
 
   tsd::core::CameraAppRef m_currentCamera;
 
-  int m_arcballUp{1};
   tsd::rendering::Manipulator m_localArcball;
   tsd::rendering::Manipulator *m_arcball{nullptr};
   tsd::rendering::UpdateToken m_cameraToken{0};
