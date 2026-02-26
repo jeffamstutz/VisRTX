@@ -28,9 +28,11 @@ void Animations::buildUI()
   tsd::core::Animation *toDelete = nullptr;
   for (size_t i = 0; i < scene.numberOfAnimations(); i++) {
     auto *animation = scene.animation(i);
+    ImGui::PushID(static_cast<int>(i));
     buildUI_editAnimation(animation);
     if (ImGui::Button("delete"))
       toDelete = animation;
+    ImGui::PopID();
   }
   if (toDelete != nullptr)
     scene.removeAnimation(toDelete);
