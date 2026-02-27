@@ -65,20 +65,6 @@ Application::Application()
         tsd::core::logStatus("[Client] Received PING from server");
       });
 
-  m_client->registerHandler(MessageType::CLIENT_RECEIVE_VIEW,
-      [this](const tsd::network::Message &msg) {
-        tsd::core::logStatus("[Client] Received view from server");
-        const auto *viewMsg =
-            tsd::network::payloadAs<tsd::network::RenderSession::View>(msg);
-        auto *core = appCore();
-        auto *manipulator = &core->view.manipulator;
-        manipulator->setConfig(
-            tsd::math::float3(
-                viewMsg->lookat.x, viewMsg->lookat.y, viewMsg->lookat.z),
-            viewMsg->azeldist.z,
-            tsd::math::float2(viewMsg->azeldist.x, viewMsg->azeldist.y));
-      });
-
   m_client->registerHandler(MessageType::CLIENT_SCENE_TRANSFER_BEGIN,
       [this](const tsd::network::Message &msg) {
         tsd::core::logStatus("[Client] Server has initiated scene transfer...");

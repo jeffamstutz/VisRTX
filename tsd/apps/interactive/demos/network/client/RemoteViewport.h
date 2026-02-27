@@ -37,6 +37,7 @@ struct RemoteViewport : public Window
   void setupRenderPipeline();
   void reshape(tsd::math::int2 newWindowSize);
 
+  void updateRenderer();
   void updateCamera();
 
   void ui_menubar();
@@ -56,13 +57,16 @@ struct RemoteViewport : public Window
 
   std::vector<tsd::core::RendererAppRef> m_rendererObjects;
   tsd::core::RendererAppRef m_currentRenderer;
-  size_t m_receivedRendererIdx{0};
+  tsd::core::CameraAppRef m_currentCamera;
+  size_t m_receivedRendererIdx{TSD_INVALID_INDEX};
+  size_t m_receivedCameraIdx{TSD_INVALID_INDEX};
 
   // Camera manipulator //
 
   tsd::rendering::Manipulator m_localArcball;
   tsd::rendering::Manipulator *m_arcball{nullptr};
   tsd::rendering::UpdateToken m_cameraToken{0};
+  bool m_manipulatorSynchronized{false};
 
   // Networking //
 

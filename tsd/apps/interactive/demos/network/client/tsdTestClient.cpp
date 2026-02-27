@@ -57,19 +57,17 @@ int main()
             session->frame.config.size.y);
       });
 
-  client->registerHandler(MessageType::CLIENT_RECEIVE_VIEW,
+  client->registerHandler(MessageType::CLIENT_RECEIVE_CURRENT_CAMERA,
       [session](const tsd::network::Message &msg) {
-        auto pos = 0u;
-        tsd::network::payloadRead(msg, pos, &session->view);
-        tsd::core::logStatus(
-            "[Client] Received view: azel=(%f,%f), dist=%f, "
-            "lookat=(%f,%f,%f)",
-            session->view.azeldist.x,
-            session->view.azeldist.y,
-            session->view.azeldist.z,
-            session->view.lookat.x,
-            session->view.lookat.y,
-            session->view.lookat.z);
+        size_t idx = 0;
+        uint32_t pos = 0;
+        if (tsd::network::payloadRead(msg, pos, &idx)) {
+          tsd::core::logStatus(
+              "[Client] Received current camera index %u from server.", idx);
+        } else {
+          tsd::core::logError(
+              "[Client] Invalid payload for CLIENT_RECEIVE_CURRENT_CAMERA");
+        }
       });
 
   client->registerHandler(MessageType::CLIENT_RECEIVE_FRAME_BUFFER_COLOR,
@@ -92,7 +90,7 @@ int main()
 
   client->send(MessageType::SERVER_STOP_RENDERING).get();
   client->send(MessageType::SERVER_REQUEST_FRAME_CONFIG).get();
-  client->send(MessageType::SERVER_REQUEST_VIEW).get();
+  client->send(MessageType::SERVER_REQUEST_CURRENT_CAMERA).get();
 
   for (int i = 0; i < 3; ++i) {
     tsd::core::logStatus("[Client] Sending PING #%d", i + 1);

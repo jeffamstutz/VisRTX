@@ -10,6 +10,8 @@
 #include "tsd/core/Logging.hpp"
 // tsd_io
 #include "tsd/io/serialization.hpp"
+// tsd_rendering
+#include "tsd/rendering/view/ManipulatorToTSD.hpp"
 // std
 #include <algorithm>
 
@@ -42,28 +44,17 @@ void RemoteViewport::buildUI()
   if (m_viewportSize != viewportSize || m_wasConnected != isConnected)
     reshape(viewportSize);
 
-  auto *core = appCore();
-  auto &scene = core->tsd.scene;
-
   if (!m_wasConnected && isConnected) {
-    m_channel->send(MessageType::SERVER_REQUEST_VIEW);
+    m_receivedCameraIdx = TSD_INVALID_INDEX;
+    m_receivedRendererIdx = TSD_INVALID_INDEX;
+    m_channel->send(MessageType::SERVER_REQUEST_CURRENT_CAMERA);
     m_channel->send(MessageType::SERVER_REQUEST_CURRENT_RENDERER);
-  } else if (isConnected && m_rendererObjects.empty()
-      && scene.numberOfObjects(ANARI_RENDERER) != 0) {
-    auto fr = scene.getObject<tsd::core::Renderer>(0);
-    m_rendererObjects = scene.renderersOfDevice(fr->rendererDeviceName());
-    m_currentRenderer = m_rendererObjects[0];
-  } else if (m_currentRenderer
-      && m_currentRenderer->index() != m_receivedRendererIdx) {
-    m_currentRenderer = m_rendererObjects[m_receivedRendererIdx];
-  } else if (!isConnected) {
-    m_rendererObjects.clear();
-    m_currentRenderer.reset();
   }
 
   m_wasConnected = isConnected;
   m_incomingFramePass->setEnabled(isConnected);
 
+  updateRenderer();
   updateCamera();
   m_pipeline.render();
 
@@ -116,6 +107,15 @@ void RemoteViewport::setNetworkChannel(tsd::network::NetworkChannel *c)
             rendererIdx);
         m_receivedRendererIdx = rendererIdx;
       });
+
+  c->registerHandler(MessageType::CLIENT_RECEIVE_CURRENT_CAMERA,
+      [this](const tsd::network::Message &msg) {
+        auto cameraIdx = *tsd::network::payloadAs<size_t>(msg);
+        tsd::core::logDebug(
+            "[Client] Received current camera index %zu from server.",
+            cameraIdx);
+        m_receivedCameraIdx = cameraIdx;
+      });
 }
 
 void RemoteViewport::saveSettings(tsd::core::DataNode &root)
@@ -163,20 +163,65 @@ void RemoteViewport::reshape(tsd::math::int2 newSize)
   }
 }
 
+void RemoteViewport::updateRenderer()
+{
+  if (!m_channel || !m_channel->isConnected()) {
+    m_rendererObjects.clear();
+    m_currentRenderer.reset();
+    return;
+  }
+
+  auto *core = appCore();
+  auto &scene = core->tsd.scene;
+  if (m_rendererObjects.empty() && scene.numberOfObjects(ANARI_RENDERER) != 0) {
+    auto fr = scene.getObject<tsd::core::Renderer>(0);
+    m_rendererObjects = scene.renderersOfDevice(fr->rendererDeviceName());
+  } else {
+    // We only update when we have the list of renderers from the server
+    return;
+  }
+
+  const bool doUpdate =
+      (!m_currentRenderer && m_receivedRendererIdx != TSD_INVALID_INDEX)
+      || (m_currentRenderer
+          && m_currentRenderer->index() != m_receivedRendererIdx);
+
+  if (doUpdate) {
+    m_currentRenderer = m_receivedRendererIdx >= m_rendererObjects.size()
+        ? tsd::core::RendererAppRef{}
+        : m_rendererObjects[m_receivedRendererIdx];
+  }
+}
+
 void RemoteViewport::updateCamera()
 {
-  if (!m_channel || !m_channel->isConnected())
+  if (!m_channel || !m_channel->isConnected()) {
+    m_currentCamera.reset();
+    return;
+  }
+
+  const bool doUpdate =
+      (!m_currentCamera && m_receivedCameraIdx != TSD_INVALID_INDEX)
+      || (m_currentCamera && m_currentCamera->index() != m_receivedCameraIdx);
+
+  if (doUpdate) {
+    auto *core = appCore();
+    auto &scene = core->tsd.scene;
+    m_currentCamera = scene.getObject<tsd::core::Camera>(m_receivedCameraIdx);
+    m_manipulatorSynchronized = false;
+    return;
+  }
+
+  if (!m_manipulatorSynchronized && m_currentCamera
+      && m_currentCamera->numMetadata() > 0) {
+    tsd::rendering::updateManipulatorFromCamera(*m_arcball, *m_currentCamera);
+    m_manipulatorSynchronized = true;
+  }
+
+  if (!m_manipulatorSynchronized || !m_arcball->hasChanged(m_cameraToken))
     return;
 
-  if (m_arcball->hasChanged(m_cameraToken)) {
-    tsd::network::RenderSession::View viewMsg;
-    viewMsg.azeldist.x = m_arcball->azel().x;
-    viewMsg.azeldist.y = m_arcball->azel().y;
-    viewMsg.azeldist.z = m_arcball->distance();
-    viewMsg.lookat = m_arcball->at();
-
-    m_channel->send(MessageType::SERVER_SET_VIEW, &viewMsg);
-  }
+  tsd::rendering::updateCameraObject(*m_currentCamera, *m_arcball);
 }
 
 void RemoteViewport::ui_menubar()
