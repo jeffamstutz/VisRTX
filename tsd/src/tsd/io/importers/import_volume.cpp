@@ -31,7 +31,7 @@ VolumeRef import_volume(
   else if (ext == ".vtu")
     field = import_VTU(scene, filepath);
   else if (ext == ".vti")
-    field = import_VTI(scene, filepath);
+    field = import_VTI(scene, filepath, location);
   else if (ext == ".silo" || ext == ".sil")
     field = import_SILO(scene, filepath);
   else {

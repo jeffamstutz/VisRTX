@@ -51,7 +51,7 @@ SpatialFieldRef import_RAW(Scene &scene, const char *filename);
 SpatialFieldRef import_FLASH(Scene &scene, const char *filename);
 SpatialFieldRef import_NVDB(Scene &scene, const char *filename);
 SpatialFieldRef import_MHD(Scene &scene, const char *filename);
-SpatialFieldRef import_VTI(Scene &scene, const char *filename);
+SpatialFieldRef import_VTI(Scene &scene, const char *filename, LayerNodeRef location = {});
 SpatialFieldRef import_VTU(Scene &scene, const char *filename);
 SpatialFieldRef import_SILO(Scene &scene, const char *filename);
 
