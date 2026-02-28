@@ -130,6 +130,9 @@ struct Object : public ParameterObserver
   Parameter &parameterAt(size_t i);
   const char *parameterNameAt(size_t i) const;
 
+  void beginParameterBatch(); // parameter changes are batched, until end
+  void endParameterBatch(); // stop batching + flush all parameter changes
+
   //// Change tracking ////
 
   ObjectVersion lastParameterChange() const;
@@ -169,7 +172,11 @@ struct Object : public ParameterObserver
   void initMetadata() const;
 
   Scene *m_scene{nullptr};
+
   ParameterMap m_parameters;
+  bool m_inParameterBatch{false};
+  std::vector<Parameter *> m_batchedParameters;
+
   anari::DataType m_type{ANARI_UNKNOWN};
   Token m_subtype;
   std::string m_name;

@@ -15,6 +15,11 @@ struct ParameterChange : public StructuredMessage
   ParameterChange(
       const tsd::core::Object *obj, const tsd::core::Parameter *param);
 
+  // Sender -- will serialize the data on construction
+  ParameterChange(const tsd::core::Object *obj,
+      const tsd::core::Parameter *const *params,
+      size_t np);
+
   // Receiver -- will setup deserialization on execute()
   ParameterChange(const Message &msg, tsd::core::Scene *scene);
 

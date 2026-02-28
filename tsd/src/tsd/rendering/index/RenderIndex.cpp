@@ -152,6 +152,13 @@ void RenderIndex::signalParameterRemoved(const Object *o, const Parameter *p)
   }
 }
 
+void RenderIndex::signalParameterBatchUpdated(
+    const Object *o, const std::vector<Parameter *> &ps)
+{
+  for (auto *p : ps)
+    signalParameterUpdated(o, p);
+}
+
 void RenderIndex::signalArrayMapped(const Array *a)
 {
   if (anari::isObject(a->elementType()))

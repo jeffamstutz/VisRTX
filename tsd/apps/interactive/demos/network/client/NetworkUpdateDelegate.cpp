@@ -75,6 +75,20 @@ void NetworkUpdateDelegate::signalParameterRemoved(
   m_channel->send(MessageType::SERVER_REMOVE_OBJECT_PARAMETER, std::move(msg));
 }
 
+void NetworkUpdateDelegate::signalParameterBatchUpdated(
+    const tsd::core::Object *o, const std::vector<tsd::core::Parameter *> &ps)
+{
+  if (!m_enabled)
+    return;
+  else if (!m_channel) {
+    tsd::core::logError(
+        "NetworkUpdateDelegate::signalParameterBatchUpdated: no channel");
+    return;
+  }
+  auto msg = tsd::network::messages::ParameterChange(o, ps.data(), ps.size());
+  m_channel->send(MessageType::SERVER_SET_OBJECT_PARAMETER, std::move(msg));
+}
+
 void NetworkUpdateDelegate::signalArrayMapped(const tsd::core::Array *)
 {
   if (!m_enabled)

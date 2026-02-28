@@ -8,6 +8,8 @@ namespace tsd::rendering {
 void updateCameraObject(
     tsd::core::Camera &c, const Manipulator &m, bool includeManipulatorMetadata)
 {
+  c.beginParameterBatch();
+
   c.setParameter("direction", m.dir());
   c.setParameter("up", m.up());
 
@@ -25,6 +27,8 @@ void updateCameraObject(
     c.setMetadataValue("manipulator.azel", m.azel());
     c.setMetadataValue("manipulator.up", int(m.axis()));
   }
+
+  c.endParameterBatch();
 }
 
 void updateManipulatorFromCamera(Manipulator &m, const tsd::core::Camera &c)

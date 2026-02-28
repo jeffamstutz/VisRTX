@@ -11,26 +11,40 @@ namespace tsd::network::messages {
 
 ParameterChange::ParameterChange(
     const tsd::core::Object *obj, const tsd::core::Parameter *param)
+    : ParameterChange(obj, &param, 1)
+{}
+
+ParameterChange::ParameterChange(const tsd::core::Object *obj,
+    const tsd::core::Parameter *const *params,
+    size_t np)
 {
-  if (!(obj && param)) {
+  if (!obj) {
     tsd::core::logError(
-        "[message::ParameterChange] No object or parameter provided");
+        "[message::ParameterChange] No object provided for multi-param ctor");
     return;
   }
 
-  // NOTE(jda) - node names intentionally short to reduce message size
   auto root = m_tree.root();
   root["o"] = tsd::core::Any(obj->type(), obj->index()); // object
-  root["n"] = param->name().str(); // parameter name
-  tsd::io::parameterToNode(*param, root["v"]); // parameter value + info
+
+  auto &ps = root["p"];
+
+  for (size_t i = 0; i < np; ++i) {
+    auto &paramNode = ps.append(); // parameter node
+    auto *param = params[i];
+    paramNode["n"] = param->name().str(); // parameter name
+    tsd::io::parameterToNode(*param, paramNode["v"]); // parameter value + info
+  }
 }
 
 ParameterChange::ParameterChange(const Message &msg, tsd::core::Scene *scene)
     : StructuredMessage(msg), m_scene(scene)
 {
-  tsd::core::logStatus(
+#if 0
+  tsd::core::logDebug(
       "[message::ParameterChange] Received message (%zu bytes)",
       msg.header.payload_length);
+#endif
 }
 
 void ParameterChange::execute()
@@ -41,7 +55,8 @@ void ParameterChange::execute()
     return;
   }
 
-  auto o = m_tree.root()["o"].getValue();
+  auto &root = m_tree.root();
+  auto o = root["o"].getValue();
   auto obj = m_scene->getObject(o);
   if (!obj) {
     tsd::core::logError(
@@ -51,9 +66,13 @@ void ParameterChange::execute()
     return;
   }
 
-  auto paramName = m_tree.root()["n"].getValueAs<std::string>();
-  auto &p = obj->addParameter(paramName.c_str()); // parameter may be new
-  tsd::io::nodeToParameter(m_tree.root()["v"], p);
+  auto &pn = root["p"];
+
+  pn.foreach_child([&](core::DataNode &child) {
+    auto paramName = child["n"].getValueAs<std::string>();
+    auto &p = obj->addParameter(paramName.c_str()); // parameter may be new
+    tsd::io::nodeToParameter(child["v"], p);
+  });
 }
 
 } // namespace tsd::network::messages

@@ -6,6 +6,7 @@
 #include "tsd/core/Logging.hpp"
 #include "tsd/core/scene/Scene.hpp"
 // std
+#include <algorithm>
 #include <iomanip>
 
 namespace tsd::core {
@@ -354,6 +355,30 @@ const char *Object::parameterNameAt(size_t i) const
   return m_parameters.at_index(i).first.c_str();
 }
 
+void Object::beginParameterBatch()
+{
+  m_inParameterBatch = true;
+}
+
+void Object::endParameterBatch()
+{
+  m_inParameterBatch = false;
+
+  auto &bp = m_batchedParameters;
+
+  // Remove duplicates
+  std::sort(bp.begin(), bp.end());
+  bp.erase(std::unique(bp.begin(), bp.end()), bp.end());
+
+  // Flush updates through delegate
+  if (m_updateDelegate)
+    m_updateDelegate->signalParameterBatchUpdated(this, bp);
+
+  m_versions.parameter++;
+
+  bp.clear();
+}
+
 ObjectVersion Object::lastParameterChange() const
 {
   return m_versions.parameter;
@@ -424,13 +449,22 @@ void Object::parameterChanged(const Parameter *p, const Any &oldValue)
       obj->decUseCount(UseKind::PARAMETER);
   }
   incObjectUseCountParameter(p);
-  if (m_updateDelegate)
+  if (m_inParameterBatch) {
+    m_batchedParameters.push_back(const_cast<Parameter *>(p));
+  } else if (m_updateDelegate) {
     m_updateDelegate->signalParameterUpdated(this, p);
-  m_versions.parameter++;
+    m_versions.parameter++;
+  }
 }
 
 void Object::removeParameter(const Parameter *p)
 {
+  if (m_inParameterBatch) {
+    logError(
+        "Object::removeParameter() called while in a parameter batch update. "
+        "This is not supported and will lead to unexpected behavior.");
+  }
+
   removeParameter(p->name());
   m_versions.parameter++;
 }
