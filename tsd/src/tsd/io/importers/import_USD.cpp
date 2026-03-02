@@ -1064,20 +1064,17 @@ static void import_usd_cube(Scene &scene,
     return {posArr, normArr};
   };
 
-  // Collect xform time samples from prim and its parent hierarchy
+  // Collect xform time samples from this prim only — do NOT walk ancestors.
+  // Parent Xform animation is already handled by the animated transform node
+  // created in import_usd_prim_recursive (setAsTransformSteps).  Walking up
+  // the hierarchy would bake the parent rotation into world-space vertex
+  // positions while the transform node applies it a second time, producing a
+  // double-transform (e.g. 720° apparent rotation for a 360° animated parent).
   std::vector<double> timeSamples;
   {
-    auto cur = prim;
-    while (cur && !cur.IsPseudoRoot()) {
-      pxr::UsdGeomXformable xformable(cur);
-      if (xformable) {
-        std::vector<double> ts;
-        xformable.GetTimeSamples(&ts);
-        for (double t : ts)
-          timeSamples.push_back(t);
-      }
-      cur = cur.GetParent();
-    }
+    pxr::UsdGeomXformable xformable(prim);
+    if (xformable)
+      xformable.GetTimeSamples(&timeSamples);
     std::sort(timeSamples.begin(), timeSamples.end());
     timeSamples.erase(
         std::unique(timeSamples.begin(), timeSamples.end()), timeSamples.end());
@@ -1534,6 +1531,27 @@ static void import_usd_camera(Scene &scene, const pxr::UsdPrim &prim)
         timeSamples.push_back(t);
     }
   }
+
+  // Also collect time samples from all animatable intrinsic attributes
+  std::vector<double> intrinsicTs;
+  {
+    auto collect = [&](pxr::UsdAttribute attr) {
+      std::vector<double> tmp;
+      attr.GetTimeSamples(&tmp);
+      for (double t : tmp)
+        intrinsicTs.push_back(t);
+    };
+    collect(usdCamera.GetFocalLengthAttr());
+    collect(usdCamera.GetHorizontalApertureAttr());
+    collect(usdCamera.GetVerticalApertureAttr());
+    collect(usdCamera.GetFStopAttr());
+    collect(usdCamera.GetFocusDistanceAttr());
+    collect(usdCamera.GetClippingRangeAttr());
+  }
+  bool hasIntrinsicAnimation = !intrinsicTs.empty();
+  for (double t : intrinsicTs)
+    timeSamples.push_back(t);
+
   std::sort(timeSamples.begin(), timeSamples.end());
   timeSamples.erase(
       std::unique(timeSamples.begin(), timeSamples.end()), timeSamples.end());
@@ -1576,27 +1594,88 @@ static void import_usd_camera(Scene &scene, const pxr::UsdPrim &prim)
   dirArr->setName((primName + "_anim_direction").c_str());
   upArr->setName((primName + "_anim_up").c_str());
 
+  // Intrinsic animation arrays (only allocated when needed)
+  ObjectUsePtr<Array> fovArr, aspectArr, focusDistArr, apertureRadiusArr;
+  float *fovs = nullptr, *aspects = nullptr;
+  float *focusDists = nullptr, *apertureRadii = nullptr;
+  if (hasIntrinsicAnimation) {
+    fovArr = scene.createArray(ANARI_FLOAT32, numFrames);
+    fovArr->setName((primName + "_anim_fovy").c_str());
+    fovs = fovArr->mapAs<float>();
+
+    aspectArr = scene.createArray(ANARI_FLOAT32, numFrames);
+    aspectArr->setName((primName + "_anim_aspect").c_str());
+    aspects = aspectArr->mapAs<float>();
+
+    if (isPerspective) {
+      focusDistArr = scene.createArray(ANARI_FLOAT32, numFrames);
+      focusDistArr->setName((primName + "_anim_focusDistance").c_str());
+      focusDists = focusDistArr->mapAs<float>();
+
+      apertureRadiusArr = scene.createArray(ANARI_FLOAT32, numFrames);
+      apertureRadiusArr->setName((primName + "_anim_apertureRadius").c_str());
+      apertureRadii = apertureRadiusArr->mapAs<float>();
+    }
+  }
+
   auto *positions = posArr->mapAs<math::float3>();
   auto *directions = dirArr->mapAs<math::float3>();
   auto *ups = upArr->mapAs<math::float3>();
 
   pxr::UsdGeomXformCache cache;
   for (size_t i = 0; i < numFrames; ++i) {
-    cache.SetTime(pxr::UsdTimeCode(timeSamples[i]));
+    pxr::UsdTimeCode tc(timeSamples[i]);
+    cache.SetTime(tc);
     auto [pos, dir, up] = buildPose(cache);
     positions[i] = pos;
     directions[i] = dir;
     ups[i] = up;
+    if (fovs) {
+      pxr::GfCamera gfc = usdCamera.GetCamera(tc);
+      float fl = gfc.GetFocalLength();
+      float va = gfc.GetVerticalAperture();
+      float ha = gfc.GetHorizontalAperture();
+      fovs[i] = 2.f * std::atan(va / (2.f * fl));
+      aspects[i] = ha / va;
+      if (focusDists) {
+        focusDists[i] = gfc.GetFocusDistance();
+        // apertureRadius from fStop: fl is in tenths of scene units
+        float fStop = gfc.GetFStop();
+        apertureRadii[i] =
+            fStop > 0.f ? (fl / 10.f) / (2.f * fStop) : 0.f;
+      }
+    }
   }
 
   posArr->unmap();
   dirArr->unmap();
   upArr->unmap();
+  if (fovArr) {
+    fovArr->unmap();
+    aspectArr->unmap();
+    if (focusDistArr) {
+      focusDistArr->unmap();
+      apertureRadiusArr->unmap();
+    }
+  }
+
+  std::vector<Token> animParams{"position", "direction", "up"};
+  std::vector<TimeStepValues> animArrays{posArr, dirArr, upArr};
+  if (hasIntrinsicAnimation) {
+    animParams.push_back("fovy");
+    animArrays.push_back(fovArr);
+    animParams.push_back("aspect");
+    animArrays.push_back(aspectArr);
+    if (isPerspective) {
+      animParams.push_back("focusDistance");
+      animArrays.push_back(focusDistArr);
+      animParams.push_back("apertureRadius");
+      animArrays.push_back(apertureRadiusArr);
+    }
+  }
 
   auto *anim = scene.addAnimation(primName.c_str());
-  anim->setAsTimeSteps(*camera,
-      std::vector<Token>{"position", "direction", "up"},
-      std::vector<TimeStepValues>{posArr, dirArr, upArr});
+  anim->setAsTimeSteps(*camera, animParams, animArrays);
 
   logStatus("[import_USD] Created animated camera '%s' (%zu frames)\n",
       primName.c_str(),
