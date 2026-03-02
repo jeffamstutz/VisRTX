@@ -22,7 +22,9 @@
 #include <pxr/usd/usd/primRange.h>
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdGeom/basisCurves.h>
+#include <pxr/usd/usdGeom/camera.h>
 #include <pxr/usd/usdGeom/cone.h>
+#include <pxr/usd/usdGeom/cube.h>
 #include <pxr/usd/usdGeom/cylinder.h>
 #include <pxr/usd/usdGeom/mesh.h>
 #include <pxr/usd/usdGeom/points.h>
@@ -990,6 +992,147 @@ static void import_usd_cylinder(Scene &scene,
   scene.insertChildObjectNode(parent, surface);
 }
 
+// Helper: Import a UsdGeomCube prim as a triangulated TSD triangle mesh,
+// with animation if xformOps on the prim or its ancestors are time-sampled.
+static void import_usd_cube(Scene &scene,
+    const pxr::UsdPrim &prim,
+    LayerNodeRef parent,
+    const pxr::GfMatrix4d &usdXform,
+    const std::string &basePath)
+{
+  pxr::UsdGeomCube cubePrim(prim);
+  double size = 2.0;
+  cubePrim.GetSizeAttr().Get(&size, pxr::UsdTimeCode::EarliestTime());
+  float h = float(size) * 0.5f;
+
+  // 6 faces x 4 verts = 24 vertices with per-face normals, 12 triangles
+  // Face order: +Z, -Z, +Y, -Y, +X, -X
+  static const float cx[6][4][3] = {
+      {{-1, -1, 1}, {1, -1, 1}, {1, 1, 1}, {-1, 1, 1}},    // +Z
+      {{1, -1, -1}, {-1, -1, -1}, {-1, 1, -1}, {1, 1, -1}}, // -Z
+      {{-1, 1, -1}, {1, 1, -1}, {1, 1, 1}, {-1, 1, 1}},     // +Y
+      {{-1, -1, 1}, {1, -1, 1}, {1, -1, -1}, {-1, -1, -1}}, // -Y
+      {{1, -1, 1}, {1, -1, -1}, {1, 1, -1}, {1, 1, 1}},     // +X
+      {{-1, -1, -1}, {-1, -1, 1}, {-1, 1, 1}, {-1, 1, -1}}, // -X
+  };
+  static const float lnx[6][3] = {
+      {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, -1, 0}, {1, 0, 0}, {-1, 0, 0}};
+
+  // Build index buffer (static, never changes)
+  std::vector<uint32_t> indices;
+  indices.reserve(36);
+  for (int f = 0; f < 6; ++f) {
+    uint32_t base = uint32_t(f * 4);
+    indices.push_back(base + 0);
+    indices.push_back(base + 1);
+    indices.push_back(base + 2);
+    indices.push_back(base + 0);
+    indices.push_back(base + 2);
+    indices.push_back(base + 3);
+  }
+
+  // Build position+normal arrays for one world transform.
+  // Positions and normals are baked into world space so that animated xform
+  // time steps can be represented by animating vertex.position/vertex.normal
+  // (mirrors the approach used by import_usd_curves).
+  auto buildFrame =
+      [&](const pxr::GfMatrix4d &xfm)
+      -> std::pair<ObjectUsePtr<Array>, ObjectUsePtr<Array>> {
+    std::vector<float3> positions;
+    std::vector<float3> normals;
+    positions.reserve(24);
+    normals.reserve(24);
+    for (int f = 0; f < 6; ++f) {
+      for (int v = 0; v < 4; ++v) {
+        pxr::GfVec4d lp(cx[f][v][0] * h, cx[f][v][1] * h, cx[f][v][2] * h, 1.0);
+        pxr::GfVec4d wp = xfm * lp;
+        positions.push_back(float3(float(wp[0]), float(wp[1]), float(wp[2])));
+      }
+      // TransformDir applies rotation+scale only (no translation) — correct for normals
+      // when there is no non-uniform scale. Normalize to handle uniform scale.
+      pxr::GfVec3d wn = xfm.TransformDir(
+          pxr::GfVec3d(lnx[f][0], lnx[f][1], lnx[f][2]));
+      wn.Normalize();
+      float3 wn3{float(wn[0]), float(wn[1]), float(wn[2])};
+      for (int v = 0; v < 4; ++v)
+        normals.push_back(wn3);
+    }
+    auto posArr = scene.createArray(ANARI_FLOAT32_VEC3, positions.size());
+    posArr->setData(positions.data(), positions.size());
+    auto normArr = scene.createArray(ANARI_FLOAT32_VEC3, normals.size());
+    normArr->setData(normals.data(), normals.size());
+    return {posArr, normArr};
+  };
+
+  // Collect xform time samples from prim and its parent hierarchy
+  std::vector<double> timeSamples;
+  {
+    auto cur = prim;
+    while (cur && !cur.IsPseudoRoot()) {
+      pxr::UsdGeomXformable xformable(cur);
+      if (xformable) {
+        std::vector<double> ts;
+        xformable.GetTimeSamples(&ts);
+        for (double t : ts)
+          timeSamples.push_back(t);
+      }
+      cur = cur.GetParent();
+    }
+    std::sort(timeSamples.begin(), timeSamples.end());
+    timeSamples.erase(
+        std::unique(timeSamples.begin(), timeSamples.end()), timeSamples.end());
+  }
+
+  std::string primName = prim.GetPath().GetString();
+  if (primName.empty())
+    primName = "<unnamed_cube>";
+
+  auto geom = scene.createObject<Geometry>(tokens::geometry::triangle);
+  geom->setName(primName.c_str());
+
+  auto [firstPos, firstNorm] = buildFrame(usdXform);
+  geom->setParameterObject("vertex.position", *firstPos);
+  geom->setParameterObject("vertex.normal", *firstNorm);
+
+  auto idxArr = scene.createArray(ANARI_UINT32_VEC3, indices.size() / 3);
+  idxArr->setData((uint3 *)indices.data(), indices.size() / 3);
+  geom->setParameterObject("primitive.index", *idxArr);
+
+  MaterialRef mat = get_bound_material(scene, prim, basePath);
+  auto surface = scene.createSurface(primName.c_str(), geom, mat);
+  logStatus("[import_USD] Assigned material to cube '%s': %s\n",
+      primName.c_str(),
+      mat->name().c_str());
+  scene.insertChildObjectNode(parent, surface);
+
+  // Build per-frame animation if xform ops have time samples
+  if (timeSamples.size() > 1) {
+    std::vector<ObjectUsePtr<Array>> posArrays;
+    std::vector<ObjectUsePtr<Array>> normArrays;
+    posArrays.push_back(firstPos);
+    normArrays.push_back(firstNorm);
+
+    pxr::UsdGeomXformCache cache;
+    for (size_t ti = 1; ti < timeSamples.size(); ++ti) {
+      cache.SetTime(pxr::UsdTimeCode(timeSamples[ti]));
+      auto xfm = cache.GetLocalToWorldTransform(prim);
+      auto [posArr, normArr] = buildFrame(xfm);
+      posArrays.push_back(posArr);
+      normArrays.push_back(normArr);
+    }
+
+    auto *anim = scene.addAnimation(primName.c_str());
+    anim->setAsTimeSteps(*geom,
+        std::vector<Token>{"vertex.position", "vertex.normal"},
+        std::vector<TimeStepArrays>{posArrays, normArrays});
+
+    logStatus(
+        "[import_USD] Cube '%s': animated xform over %zu frames\n",
+        primName.c_str(),
+        timeSamples.size());
+  }
+}
+
 // Helper: Import a UsdVolVolume prim as a TSD volume geometry
 static void import_usd_volume(Scene &scene,
     const pxr::UsdPrim &prim,
@@ -1348,6 +1491,118 @@ static void import_usd_dome_light(Scene &scene,
   scene.insertChildObjectNode(parent, light);
 }
 
+// Helper: Import a UsdGeomCamera prim as an animated TSD camera.
+// Collects xform time samples from the prim and parent hierarchy so that
+// orbit/crane rigs animate correctly even when the camera prim itself is static.
+static void import_usd_camera(Scene &scene, const pxr::UsdPrim &prim)
+{
+  std::string primName = prim.GetName().GetString();
+  if (primName.empty())
+    primName = "<unnamed_camera>";
+
+  pxr::UsdGeomCamera usdCamera(prim);
+
+  // Read intrinsics at default time (usually static)
+  pxr::GfCamera gfCamDef = usdCamera.GetCamera(pxr::UsdTimeCode::Default());
+  bool isPerspective =
+      gfCamDef.GetProjection() == pxr::GfCamera::Perspective;
+  const char *cameraType = isPerspective ? "perspective" : "orthographic";
+  float focalLength = gfCamDef.GetFocalLength();
+  float horizAp = gfCamDef.GetHorizontalAperture();
+  float vertAp = gfCamDef.GetVerticalAperture();
+  float fovV = 2.f * std::atan(vertAp / (2.f * focalLength));
+
+  auto camera = scene.createObject<Camera>(cameraType);
+  camera->setName(primName.c_str());
+
+  if (isPerspective) {
+    camera->setParameter("fovy", fovV);
+    camera->setParameter("aspect", horizAp / vertAp);
+  } else {
+    camera->setParameter("height", vertAp);
+    camera->setParameter("aspect", horizAp / vertAp);
+  }
+
+  // Collect xform time samples from prim and its parent hierarchy
+  std::vector<double> timeSamples;
+  for (auto cur = prim; cur && !cur.IsPseudoRoot(); cur = cur.GetParent()) {
+    pxr::UsdGeomXformable xformable(cur);
+    if (xformable) {
+      std::vector<double> ts;
+      xformable.GetTimeSamples(&ts);
+      for (double t : ts)
+        timeSamples.push_back(t);
+    }
+  }
+  std::sort(timeSamples.begin(), timeSamples.end());
+  timeSamples.erase(
+      std::unique(timeSamples.begin(), timeSamples.end()), timeSamples.end());
+
+  // Compute world-space pose from a transform cache at a given time
+  auto buildPose = [&](pxr::UsdGeomXformCache &cache)
+      -> std::tuple<float3, float3, float3> {
+    auto xfm = cache.GetLocalToWorldTransform(prim);
+    auto gfPos = xfm.Transform(pxr::GfVec3d(0, 0, 0));
+    auto gfDir = xfm.TransformDir(pxr::GfVec3d(0, 0, -1));
+    gfDir.Normalize();
+    auto gfUp = xfm.TransformDir(pxr::GfVec3d(0, 1, 0));
+    gfUp.Normalize();
+    return {float3{float(gfPos[0]), float(gfPos[1]), float(gfPos[2])},
+        float3{float(gfDir[0]), float(gfDir[1]), float(gfDir[2])},
+        float3{float(gfUp[0]), float(gfUp[1]), float(gfUp[2])}};
+  };
+
+  // Always seed the camera with a valid pose at Default time
+  {
+    pxr::UsdGeomXformCache initCache(pxr::UsdTimeCode::Default());
+    auto [pos, dir, up] = buildPose(initCache);
+    camera->setParameter("position", pos);
+    camera->setParameter("direction", dir);
+    camera->setParameter("up", up);
+  }
+
+  if (timeSamples.size() <= 1) {
+    logStatus("[import_USD] Created static camera '%s'\n", primName.c_str());
+    return;
+  }
+
+  // Build flat per-param arrays (TimeStepValues: one big array per parameter,
+  // element-indexed by frame — same pattern as Core.cpp camera path animation)
+  size_t numFrames = timeSamples.size();
+  auto posArr = scene.createArray(ANARI_FLOAT32_VEC3, numFrames);
+  auto dirArr = scene.createArray(ANARI_FLOAT32_VEC3, numFrames);
+  auto upArr = scene.createArray(ANARI_FLOAT32_VEC3, numFrames);
+  posArr->setName((primName + "_anim_position").c_str());
+  dirArr->setName((primName + "_anim_direction").c_str());
+  upArr->setName((primName + "_anim_up").c_str());
+
+  auto *positions = posArr->mapAs<math::float3>();
+  auto *directions = dirArr->mapAs<math::float3>();
+  auto *ups = upArr->mapAs<math::float3>();
+
+  pxr::UsdGeomXformCache cache;
+  for (size_t i = 0; i < numFrames; ++i) {
+    cache.SetTime(pxr::UsdTimeCode(timeSamples[i]));
+    auto [pos, dir, up] = buildPose(cache);
+    positions[i] = pos;
+    directions[i] = dir;
+    ups[i] = up;
+  }
+
+  posArr->unmap();
+  dirArr->unmap();
+  upArr->unmap();
+
+  auto *anim = scene.addAnimation(primName.c_str());
+  anim->setAsTimeSteps(*camera,
+      std::vector<Token>{"position", "direction", "up"},
+      std::vector<TimeStepValues>{posArr, dirArr, upArr});
+
+  logStatus("[import_USD] Created animated camera '%s' (%zu frames)\n",
+      primName.c_str(),
+      numFrames);
+}
+
 // Helper to check if a GfMatrix4d is identity
 static bool is_identity(const pxr::GfMatrix4d &m)
 {
@@ -1391,6 +1646,13 @@ static void import_usd_prim_recursive(Scene &scene,
     return;
   }
 
+  // Cameras are imported as standalone TSD Camera objects (not scene nodes).
+  // import_usd_camera walks the hierarchy itself for animated rigs.
+  if (prim.IsA<pxr::UsdGeomCamera>()) {
+    import_usd_camera(scene, prim);
+    return;
+  }
+
   // Only declare these in the main body (non-instance case)
   bool resetsXformStack = false;
   pxr::GfMatrix4d usdLocalXform =
@@ -1402,7 +1664,7 @@ static void import_usd_prim_recursive(Scene &scene,
   bool isGeometry = prim.IsA<pxr::UsdGeomMesh>()
       || prim.IsA<pxr::UsdGeomPoints>() || prim.IsA<pxr::UsdGeomSphere>()
       || prim.IsA<pxr::UsdGeomCone>() || prim.IsA<pxr::UsdGeomCylinder>()
-      || prim.IsA<pxr::UsdGeomBasisCurves>();
+      || prim.IsA<pxr::UsdGeomCube>() || prim.IsA<pxr::UsdGeomBasisCurves>();
   bool isVolume = prim.IsA<pxr::UsdVolVolume>();
   bool isLight = prim.IsA<pxr::UsdLuxDistantLight>()
       || prim.IsA<pxr::UsdLuxRectLight>() || prim.IsA<pxr::UsdLuxSphereLight>()
@@ -1449,6 +1711,8 @@ static void import_usd_prim_recursive(Scene &scene,
     import_usd_cone(scene, prim, thisNode, thisWorldXform);
   } else if (prim.IsA<pxr::UsdGeomCylinder>()) {
     import_usd_cylinder(scene, prim, thisNode, thisWorldXform);
+  } else if (prim.IsA<pxr::UsdGeomCube>()) {
+    import_usd_cube(scene, prim, thisNode, thisWorldXform, basePath);
   } else if (prim.IsA<pxr::UsdGeomBasisCurves>()) {
     import_usd_curves(scene, prim, thisNode, thisWorldXform);
   } else if (prim.IsA<pxr::UsdLuxDistantLight>()) {
