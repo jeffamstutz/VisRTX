@@ -6,6 +6,7 @@
 #include "tsd/core/Any.hpp"
 #include "tsd/core/DataTree.hpp"
 #include "tsd/core/scene/AnyObjectUsePtr.hpp"
+#include "tsd/core/scene/Layer.hpp"
 #include "tsd/core/scene/ObjectUsePtr.hpp"
 #include "tsd/core/scene/objects/Array.hpp"
 // std
@@ -42,6 +43,8 @@ struct Animation
       const std::vector<Token> &parameters,
       const std::vector<TimeStepArrays> &steps);
 
+  void setAsTransformSteps(LayerNodeRef node, std::vector<math::mat4> frames);
+
   void update(float time);
 
   bool targetsObject(const Object *obj) const;
@@ -66,6 +69,9 @@ struct Animation
     std::vector<Token> parameterName;
     std::vector<TimeStepArrays> stepsArrays;
     std::vector<TimeStepValues> stepsValues;
+
+    LayerNodeRef transformNode;
+    std::vector<math::mat4> transformFrames;
   } m_timesteps;
 };
 

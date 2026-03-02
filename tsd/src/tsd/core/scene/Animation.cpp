@@ -93,9 +93,33 @@ void Animation::setAsTimeSteps(Object &obj,
   updateInfoString(0.f, true);
 }
 
+void Animation::setAsTransformSteps(
+    LayerNodeRef node, std::vector<math::mat4> frames)
+{
+  m_timesteps = {};
+  m_timesteps.transformNode = node;
+  m_timesteps.transformFrames = std::move(frames);
+  updateInfoString(0.f, false);
+}
+
 void Animation::update(float time)
 {
   auto &ts = m_timesteps;
+
+  if (!ts.transformFrames.empty()) {
+    if (!ts.transformNode) {
+      logWarning(
+          "[AnimatedTimeSeries::update()] transform animation '%s' has no node",
+          name().c_str());
+      return;
+    }
+    const size_t idx =
+        calculateIndexForTime(time, ts.transformFrames.size(), false);
+    (*ts.transformNode)->setAsTransform(ts.transformFrames[idx]);
+    m_scene->signalLayerChange(ts.transformNode->container());
+    updateInfoString(time, false);
+    return;
+  }
 
   if ((ts.stepsValues.empty() && ts.stepsArrays.empty()) || !ts.object
       || ts.parameterName.empty()) {
@@ -132,6 +156,8 @@ bool Animation::targetsObject(const Object *obj) const
 size_t Animation::timeStepCount() const
 {
   const auto &ts = m_timesteps;
+  if (!ts.transformFrames.empty())
+    return ts.transformFrames.size();
   if (!ts.stepsValues.empty()) {
     const auto &steps = ts.stepsValues.front();
     return steps ? steps->size() : 0;
@@ -259,7 +285,9 @@ void Animation::updateInfoString(float time, bool cellCentered)
         + std::to_string(numSteps - 1);
   };
 
-  if (!ts.stepsValues.empty() && ts.stepsValues[0]) {
+  if (!ts.transformFrames.empty()) {
+    doUpdate(ts.transformFrames.size());
+  } else if (!ts.stepsValues.empty() && ts.stepsValues[0]) {
     const auto &a = *ts.stepsValues[0];
     doUpdate(a.size());
   } else if (!ts.stepsArrays.empty() && !ts.stepsArrays[0].empty()) {

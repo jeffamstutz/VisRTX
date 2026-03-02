@@ -1677,6 +1677,17 @@ static void import_usd_prim_recursive(Scene &scene,
   for (const auto &child : prim.GetChildren())
     ++numChildren;
 
+  // For pure xform/scope prims, check for time-sampled animation *before*
+  // deciding whether to create a node — an animated xform that happens to be
+  // identity at the default time still needs a node.
+  std::vector<double> xformTimeSamples;
+  if (isXform) {
+    pxr::UsdGeomXformable xformable(prim);
+    if (xformable)
+      xformable.GetTimeSamples(&xformTimeSamples);
+  }
+  bool hasXformAnimation = xformTimeSamples.size() > 1;
+
   // Only create a transform node if:
   // - The local transform is not identity
   // - The prim is geometry, light (not dome), or volume
@@ -1685,8 +1696,9 @@ static void import_usd_prim_recursive(Scene &scene,
   //     its orientation axes and at least VisRTX and Barney do not correctly
   //     support transforming the HDRI lights.
   // - The prim resets the xform stack
+  // - The prim is an animated pure-xform node
   bool createNode = !is_identity(usdLocalXform) || isGeometry || isLight
-      || isVolume || resetsXformStack;
+      || isVolume || resetsXformStack || hasXformAnimation;
   createNode = createNode && !isDomeLight;
 
   tsd::math::mat4 tsdXform = to_tsd_mat4(usdLocalXform);
@@ -1698,6 +1710,28 @@ static void import_usd_prim_recursive(Scene &scene,
   if (createNode) {
     thisNode =
         scene.insertChildTransformNode(parent, tsdXform, primName.c_str());
+  }
+
+  // Attach xform animation for pure xform/scope prims with time samples.
+  // Geometry prims are excluded — proc shapes bake world-space positions, and
+  // mesh vertices are already in local space but we don't yet handle the
+  // animated-xform-on-mesh case here.
+  if (hasXformAnimation) {
+    pxr::UsdGeomXformCache tc;
+    std::vector<math::mat4> frames;
+    frames.reserve(xformTimeSamples.size());
+    for (double t : xformTimeSamples) {
+      pxr::UsdTimeCode timeCode(t);
+      tc.SetTime(timeCode);
+      bool resets = false;
+      frames.push_back(to_tsd_mat4(tc.GetLocalTransformation(prim, &resets)));
+    }
+    size_t numFrames = frames.size();
+    scene.addAnimation(primName.c_str())
+        ->setAsTransformSteps(thisNode, std::move(frames));
+    logStatus("[import_USD] Xform '%s': animated transform (%zu frames)\n",
+        primName.c_str(),
+        numFrames);
   }
 
   // Import geometry for this prim (if any)
