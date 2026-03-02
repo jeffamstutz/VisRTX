@@ -1112,7 +1112,8 @@ static void import_usd_cube(Scene &scene,
     pxr::UsdGeomXformCache cache;
     for (size_t ti = 1; ti < timeSamples.size(); ++ti) {
       cache.SetTime(pxr::UsdTimeCode(timeSamples[ti]));
-      auto xfm = cache.GetLocalToWorldTransform(prim);
+      bool resets = false;
+      auto xfm = cache.GetLocalTransformation(prim, &resets);
       auto [posArr, normArr] = buildFrame(xfm);
       posArrays.push_back(posArr);
       normArrays.push_back(normArr);
@@ -1813,21 +1814,29 @@ static void import_usd_prim_recursive(Scene &scene,
         numFrames);
   }
 
-  // Import geometry for this prim (if any)
+  // Import geometry for this prim (if any).
+  // Pass identity as the vertex-space transform: geometry data (USD mesh
+  // vertices, curve points, implicit shape origins) is always expressed in the
+  // prim's own local space.  The transform node created above (tsdXform =
+  // usdLocalXform) and its animated parent chain handle all world positioning,
+  // so baking world-space positions here would double-apply every ancestor
+  // transform.  Lights and volumes are excluded — they have different
+  // world-space semantics and are handled separately.
+  const pxr::GfMatrix4d identity(1.0);
   if (prim.IsA<pxr::UsdGeomMesh>()) {
-    import_usd_mesh(scene, prim, thisNode, thisWorldXform, basePath);
+    import_usd_mesh(scene, prim, thisNode, identity, basePath);
   } else if (prim.IsA<pxr::UsdGeomPoints>()) {
-    import_usd_points(scene, prim, thisNode, thisWorldXform);
+    import_usd_points(scene, prim, thisNode, identity);
   } else if (prim.IsA<pxr::UsdGeomSphere>()) {
-    import_usd_sphere(scene, prim, thisNode, thisWorldXform);
+    import_usd_sphere(scene, prim, thisNode, identity);
   } else if (prim.IsA<pxr::UsdGeomCone>()) {
-    import_usd_cone(scene, prim, thisNode, thisWorldXform);
+    import_usd_cone(scene, prim, thisNode, identity);
   } else if (prim.IsA<pxr::UsdGeomCylinder>()) {
-    import_usd_cylinder(scene, prim, thisNode, thisWorldXform);
+    import_usd_cylinder(scene, prim, thisNode, identity);
   } else if (prim.IsA<pxr::UsdGeomCube>()) {
-    import_usd_cube(scene, prim, thisNode, thisWorldXform, basePath);
+    import_usd_cube(scene, prim, thisNode, identity, basePath);
   } else if (prim.IsA<pxr::UsdGeomBasisCurves>()) {
-    import_usd_curves(scene, prim, thisNode, thisWorldXform);
+    import_usd_curves(scene, prim, thisNode, identity);
   } else if (prim.IsA<pxr::UsdLuxDistantLight>()) {
     import_usd_distant_light(scene, prim, thisNode);
   } else if (prim.IsA<pxr::UsdLuxRectLight>()) {
