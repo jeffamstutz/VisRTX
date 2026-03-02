@@ -123,7 +123,11 @@ static void grad3D(const float *fc,
     for (size_t z = 0; z < nz; ++z)
       for (size_t x = 0; x < nx; ++x)
         pass(fc + z * slab + x, gc + z * slab + x);
-  } else {
+  } else if (axis == 2) {
+    for (size_t y = 0; y < ny; ++y)
+      for (size_t x = 0; x < nx; ++x)
+        pass(fc + y * nx + x, gc + y * nx + x);
+  } else { // axis == 0
     for (size_t r = 0; r < outer; ++r)
       pass(fc + r * n * s, gc + r * n * s);
   }

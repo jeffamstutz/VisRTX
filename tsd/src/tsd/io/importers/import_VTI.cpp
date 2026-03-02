@@ -20,12 +20,15 @@
 // std
 #include <iomanip>
 #include <iostream>
+#include <vector>
 
 namespace tsd::io {
 
 #if TSD_USE_VTK
-SpatialFieldRef import_VTI(
-    Scene &scene, const char *filepath, LayerNodeRef location)
+SpatialFieldRef import_VTI(Scene &scene,
+    const char *filepath,
+    LayerNodeRef /*location*/,
+    std::vector<SpatialFieldRef> *extraFields)
 {
   vtkNew<vtkXMLImageDataReader> reader;
   reader->SetFileName(filepath);
@@ -55,24 +58,46 @@ SpatialFieldRef import_VTI(
   // --- Write point data arrays ---
   vtkPointData *pointData = grid->GetPointData();
   bool found = false;
+  bool firstField = true;
+
+  auto makeField = [&](const std::string &name) -> SpatialFieldRef {
+    auto f = scene.createObject<SpatialField>(
+        tokens::spatial_field::structuredRegular);
+    f->setName(name.c_str());
+    f->setParameter("origin", float3(origin[0], origin[1], origin[2]));
+    f->setParameter("spacing", float3(spacing[0], spacing[1], spacing[2]));
+    return f;
+  };
+
+  auto storeExtra = [&](SpatialFieldRef &f) {
+    if (extraFields)
+      extraFields->push_back(f);
+  };
+
   for (uint32_t i = 0; i < pointData->GetNumberOfArrays(); ++i) {
     vtkDataArray *array = pointData->GetArray(i);
+    const char *arrName = array->GetName();
+    std::string baseName = (arrName && arrName[0] != '\0')
+        ? std::string(arrName)
+        : fileOf(filepath);
 
     int numComponents = array->GetNumberOfComponents();
 
     if (numComponents == 1) {
       auto a = makeArray3DFromVTK(
           scene, array, dims[0], dims[1], dims[2], "[import_VTI]");
-      field->setParameterObject("data", *a);
+      if (firstField) {
+        field->setName(baseName.c_str());
+        field->setParameterObject("data", *a);
+        firstField = false;
+      } else {
+        auto extra = makeField(baseName);
+        extra->setParameterObject("data", *a);
+        storeExtra(extra);
+      }
       found = true;
-      break;
     } else if (numComponents == 3) {
       // Split into 3 scalar SpatialFields: {name}_x, {name}_y, {name}_z
-      const char *arrName = array->GetName();
-      std::string baseName = (arrName && arrName[0] != '\0')
-          ? std::string(arrName)
-          : fileOf(filepath);
-
       std::string nameX = baseName + "_x";
       std::string nameY = baseName + "_y";
       std::string nameZ = baseName + "_z";
@@ -99,43 +124,23 @@ SpatialFieldRef import_VTI(
       arrY->unmap();
       arrZ->unmap();
 
-      // Main field (_x component)
-      field->setName(nameX.c_str());
-      field->setParameterObject("data", *arrX);
+      if (firstField) {
+        field->setName(nameX.c_str());
+        field->setParameterObject("data", *arrX);
+        firstField = false;
+      } else {
+        auto fieldX = makeField(nameX);
+        fieldX->setParameterObject("data", *arrX);
+        storeExtra(fieldX);
+      }
 
-      // _y component field in the scene object pool
-      auto fieldY = scene.createObject<SpatialField>(
-          tokens::spatial_field::structuredRegular);
-      fieldY->setName(nameY.c_str());
-      fieldY->setParameter("origin", float3(origin[0], origin[1], origin[2]));
-      fieldY->setParameter(
-          "spacing", float3(spacing[0], spacing[1], spacing[2]));
+      auto fieldY = makeField(nameY);
       fieldY->setParameterObject("data", *arrY);
+      storeExtra(fieldY);
 
-      // _z component field in the scene object pool
-      auto fieldZ = scene.createObject<SpatialField>(
-          tokens::spatial_field::structuredRegular);
-      fieldZ->setName(nameZ.c_str());
-      fieldZ->setParameter("origin", float3(origin[0], origin[1], origin[2]));
-      fieldZ->setParameter(
-          "spacing", float3(spacing[0], spacing[1], spacing[2]));
+      auto fieldZ = makeField(nameZ);
       fieldZ->setParameterObject("data", *arrZ);
-
-      // Anchor Y and Z fields as Volume nodes so they survive scene cleanup
-      // and are selectable in the UI (e.g., for Flow Analysis).
-      // The caller is responsible for wrapping the returned X field.
-      auto insertVolume = [&](SpatialFieldRef &f, const std::string &name) {
-        math::float2 vr = f->computeValueRange();
-        auto tx = scene.insertChildTransformNode(
-            location ? location : scene.defaultLayer()->root());
-        auto [inst, vol] = scene.insertNewChildObjectNode<Volume>(
-            tx, tokens::volume::transferFunction1D);
-        vol->setName(name.c_str());
-        vol->setParameterObject("value", *f);
-        vol->setParameter("valueRange", ANARI_FLOAT32_BOX1, &vr);
-      };
-      insertVolume(fieldY, nameY);
-      insertVolume(fieldZ, nameZ);
+      storeExtra(fieldZ);
 
       logStatus(
           "[import_VTI] split 3-component array '%s' into '%s', '%s', '%s'",
@@ -144,7 +149,6 @@ SpatialFieldRef import_VTI(
           nameY.c_str(),
           nameZ.c_str());
       found = true;
-      break;
     } else {
       logWarning(
           "[import_VTI] array '%s' has %d components (only 1 or 3 are "
@@ -166,7 +170,10 @@ SpatialFieldRef import_VTI(
   return field;
 }
 #else
-SpatialFieldRef import_VTI(Scene &scene, const char *filepath, LayerNodeRef)
+SpatialFieldRef import_VTI(Scene &scene,
+    const char *filepath,
+    LayerNodeRef,
+    std::vector<SpatialFieldRef> *)
 {
   logError("[import_VTI] VTK not enabled in TSD build.");
   return {};

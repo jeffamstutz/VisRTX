@@ -30,8 +30,25 @@ VolumeRef import_volume(
     field = import_MHD(scene, filepath);
   else if (ext == ".vtu")
     field = import_VTU(scene, filepath);
-  else if (ext == ".vti")
-    field = import_VTI(scene, filepath, location);
+  else if (ext == ".vti") {
+    std::vector<SpatialFieldRef> extraFields;
+    field = import_VTI(scene, filepath, location, &extraFields);
+    // Store extra fields as named object parameters on the Volume so they
+    // survive scene GC and are selectable via the ObjectEditor "select" button.
+    if (field && !extraFields.empty()) {
+      float2 valueRange = field->computeValueRange();
+      auto tx = scene.insertChildTransformNode(
+          location ? location : scene.defaultLayer()->root());
+      auto [inst, volume] = scene.insertNewChildObjectNode<Volume>(
+          tx, tokens::volume::transferFunction1D);
+      volume->setName(fileOf(filepath).c_str());
+      volume->setParameterObject("value", *field);
+      volume->setParameter("valueRange", ANARI_FLOAT32_BOX1, &valueRange);
+      for (auto &extra : extraFields)
+        volume->setParameterObject(extra->name().c_str(), *extra);
+      return volume;
+    }
+  }
   else if (ext == ".silo" || ext == ".sil")
     field = import_SILO(scene, filepath);
   else {
