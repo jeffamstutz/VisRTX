@@ -349,6 +349,19 @@ VISRTX_DEVICE void cullbackFaces()
     optixIgnoreIntersection();
 }
 
+VISRTX_DEVICE void cullCutPlane()
+{
+  auto &ss = screenSample();
+  auto &fd = *ss.frameData;
+  const auto &cp = fd.renderer.cutPlane;
+  if (cp.w <= -1e28f)
+    return;
+  const vec3 N(cp.x, cp.y, cp.z);
+  const vec3 hitPos = hitpoint();
+  if (glm::dot(N, hitPos) + cp.w < 0.f)
+    optixIgnoreIntersection();
+}
+
 VISRTX_DEVICE void populateSurfaceHit(SurfaceHit &hit)
 {
   const auto &ss = ray::screenSample();

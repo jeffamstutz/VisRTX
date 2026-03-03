@@ -193,6 +193,15 @@
           "minimum": 0.0001,
           "maximum": 10.0,
           "description": "sampling rate of volumes when ray marching shadows"
+        },
+        {
+          "name": "cutPlane",
+          "types": [
+            "ANARI_FLOAT32_VEC4"
+          ],
+          "tags": [],
+          "default": [0.0, 0.0, 0.0, -1e30],
+          "description": "cutting plane equation (nx, ny, nz, d); disabled when w <= -1e28"
         }
       ]
     },
@@ -320,6 +329,15 @@
           "minimum": 0.001,
           "maximum": 10.0,
           "description": "sampling rate of volumes when ray marching"
+        },
+        {
+          "name": "cutPlane",
+          "types": [
+            "ANARI_FLOAT32_VEC4"
+          ],
+          "tags": [],
+          "default": [0.0, 0.0, 0.0, -1e30],
+          "description": "cutting plane equation (nx, ny, nz, d); disabled when w <= -1e28"
         }
       ]
     },
@@ -406,6 +424,15 @@
           "default": 5,
           "minimum": 1,
           "description": "Maximum number of ray bounces"
+        },
+        {
+          "name": "cutPlane",
+          "types": [
+            "ANARI_FLOAT32_VEC4"
+          ],
+          "tags": [],
+          "default": [0.0, 0.0, 0.0, -1e30],
+          "description": "cutting plane equation (nx, ny, nz, d); disabled when w <= -1e28"
         }
       ]
     },

@@ -87,6 +87,31 @@ VISRTX_DEVICE void renderPixel(FrameGPUData &frameData, ScreenSample ss)
     auto ray = makePrimaryRay(ss, isVeryFirstRay);
     float tmax = ray.t.upper;
 
+    // Apply cutting plane (disabled sentinel: w <= -1e28f)
+    {
+      const auto &cp = rendererParams.cutPlane;
+      if (cp.w > -1e28f) {
+        const vec3 N(cp.x, cp.y, cp.z);
+        const float dist_org = glm::dot(N, ray.org) + cp.w;
+        const float denom = glm::dot(N, ray.dir);
+        if (dist_org >= 0.f) {
+          // camera on visible side: clip where ray exits the half-space
+          if (denom < 0.f) {
+            float t_cut = -dist_org / denom;
+            tmax = glm::min(tmax, t_cut);
+          }
+        } else {
+          // camera on invisible side: advance origin to where ray enters
+          if (denom > 0.f) {
+            float t_entry = -dist_org / denom;
+            ray.org += t_entry * ray.dir;
+          } else {
+            tmax = 0.f; // ray never enters visible half-space
+          }
+        }
+      }
+    }
+
     // Output accumulators
     vec3 outputColor(0.f);
     vec3 outputAlbedo(0.f);

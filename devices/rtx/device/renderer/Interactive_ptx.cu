@@ -179,6 +179,7 @@ VISRTX_GLOBAL void __anyhit__shadow()
   auto &rendererParams = frameData.renderer.params;
 
   if (ray::isIntersectingSurfaces()) {
+    ray::cullCutPlane();
     SurfaceHit hit;
     ray::populateSurfaceHit(hit);
 
@@ -210,6 +211,7 @@ VISRTX_GLOBAL void __anyhit__shadow()
 VISRTX_GLOBAL void __anyhit__shading()
 {
   ray::cullbackFaces();
+  ray::cullCutPlane();
 }
 
 VISRTX_GLOBAL void __closesthit__shading()

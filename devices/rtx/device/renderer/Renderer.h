@@ -96,6 +96,7 @@ struct Renderer : public Object
   bool m_cullTriangleBF{false};
   bool m_premultiplyBackground{false};
   float m_volumeSamplingRate{1.f};
+  vec4 m_cutPlane{0.f, 0.f, 0.f, -1e30f};
 
   helium::ChangeObserverPtr<Array2D> m_backgroundImage;
   cudaTextureObject_t m_backgroundTexture{};

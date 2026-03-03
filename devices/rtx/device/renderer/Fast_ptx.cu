@@ -51,6 +51,7 @@ VISRTX_GLOBAL void __closesthit__shadow()
 
 VISRTX_GLOBAL void __anyhit__shadow()
 {
+  ray::cullCutPlane();
   SurfaceHit hit;
   ray::populateSurfaceHit(hit);
 
@@ -70,6 +71,7 @@ VISRTX_GLOBAL void __anyhit__shadow()
 VISRTX_GLOBAL void __anyhit__primary()
 {
   ray::cullbackFaces();
+  ray::cullCutPlane();
 }
 
 VISRTX_GLOBAL void __closesthit__primary()
