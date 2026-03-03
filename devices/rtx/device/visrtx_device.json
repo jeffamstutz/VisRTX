@@ -200,7 +200,7 @@
             "ANARI_FLOAT32_VEC4"
           ],
           "tags": [],
-          "default": [0.0, 0.0, 0.0, -1e30],
+          "default": [0.0, 0.0, 0.0, 0.0],
           "description": "cutting plane equation (nx, ny, nz, d); disabled when all zero (vec4(0))"
         }
       ]
@@ -336,7 +336,7 @@
             "ANARI_FLOAT32_VEC4"
           ],
           "tags": [],
-          "default": [0.0, 0.0, 0.0, -1e30],
+          "default": [0.0, 0.0, 0.0, 0.0],
           "description": "cutting plane equation (nx, ny, nz, d); disabled when all zero (vec4(0))"
         }
       ]
@@ -431,7 +431,7 @@
             "ANARI_FLOAT32_VEC4"
           ],
           "tags": [],
-          "default": [0.0, 0.0, 0.0, -1e30],
+          "default": [0.0, 0.0, 0.0, 0.0],
           "description": "cutting plane equation (nx, ny, nz, d); disabled when all zero (vec4(0))"
         }
       ]
