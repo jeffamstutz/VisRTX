@@ -88,22 +88,52 @@ __device__ static double q_crit_d(double j00,
 }
 
 // ---------------------------------------------------------------------------
-// grad3D_kernel — one thread per output element.
+// grad1 — one directional gradient for element tid.
 //
-// axis 0 (x): i=ix, n=nx, stride s=1
-// axis 1 (y): i=iy, n=ny, stride s=nx
-// axis 2 (z): i=iz, n=nz, stride s=nx*ny
+// i      : index of this element along the chosen axis
+// n      : extent along the chosen axis
+// s      : stride in the flat array along the chosen axis
+// c      : coordinate array along the chosen axis (length n)
 //
 // Boundary: 1st-order one-sided.  Interior: 2nd-order central.
 // ---------------------------------------------------------------------------
 
-__global__ static void grad3D_kernel(const float *fc,
-    double *gc,
+__device__ static double grad1(const float *fc,
+    size_t tid,
+    size_t i,
+    size_t n,
+    size_t s,
+    const double *c)
+{
+  if (i == 0)
+    return ((double)fc[tid + s] - (double)fc[tid]) / (c[1] - c[0]);
+  if (i == n - 1)
+    return ((double)fc[tid] - (double)fc[tid - s]) / (c[n - 1] - c[n - 2]);
+  return ((double)fc[tid + s] - (double)fc[tid - s]) / (c[i + 1] - c[i - 1]);
+}
+
+// ---------------------------------------------------------------------------
+// vort_fused_kernel — one thread per voxel.
+//
+// Computes all 9 Jacobian components inline (register-resident) and
+// immediately produces the requested vortical output(s).  Eliminates the
+// 9 intermediate gradient arrays and the 9 separate grad3D kernel launches
+// that existed in the previous split formulation.
+// ---------------------------------------------------------------------------
+
+__global__ static void vort_fused_kernel(const float *u,
+    const float *v,
+    const float *w,
+    const double *x_,
+    const double *y_,
+    const double *z_,
+    float *vorticity,
+    float *helicity,
+    float *lambda2,
+    float *qCriterion,
     size_t nx,
     size_t ny,
-    size_t nz,
-    int axis,
-    const double *c)
+    size_t nz)
 {
   const size_t len = nx * ny * nz;
   const size_t tid = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
@@ -115,99 +145,40 @@ __global__ static void grad3D_kernel(const float *fc,
   const size_t iy = (tid % slab) / nx;
   const size_t ix = tid % nx;
 
-  size_t i, n, s;
-  if (axis == 0) {
-    i = ix;
-    n = nx;
-    s = 1;
-  } else if (axis == 1) {
-    i = iy;
-    n = ny;
-    s = nx;
-  } else {
-    i = iz;
-    n = nz;
-    s = slab;
-  }
-
-  double val;
-  if (i == 0)
-    val = ((double)fc[tid + s] - (double)fc[tid]) / (c[1] - c[0]);
-  else if (i == n - 1)
-    val = ((double)fc[tid] - (double)fc[tid - s]) / (c[n - 1] - c[n - 2]);
-  else
-    val =
-        ((double)fc[tid + s] - (double)fc[tid - s]) / (c[i + 1] - c[i - 1]);
-
-  gc[tid] = val;
-}
-
-// ---------------------------------------------------------------------------
-// vort_from_jacobians_kernel — one thread per voxel.
-// ---------------------------------------------------------------------------
-
-__global__ static void vort_from_jacobians_kernel(const float *u,
-    const float *v,
-    const float *w,
-    const double *dux,
-    const double *dvx,
-    const double *dwx,
-    const double *duy,
-    const double *dvy,
-    const double *dwy,
-    const double *duz,
-    const double *dvz,
-    const double *dwz,
-    float *vorticity,
-    float *helicity,
-    float *lambda2,
-    float *qCriterion,
-    size_t len)
-{
-  const size_t i = (size_t)blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= len)
-    return;
+  // All 9 Jacobian components — kept in registers, never written to DRAM.
+  // Convention: d<vel><coord>, e.g. duy = du/dy.
+  const double dux = grad1(u, tid, ix, nx, 1, x_);
+  const double duy = grad1(u, tid, iy, ny, nx, y_);
+  const double duz = grad1(u, tid, iz, nz, slab, z_);
+  const double dvx = grad1(v, tid, ix, nx, 1, x_);
+  const double dvy = grad1(v, tid, iy, ny, nx, y_);
+  const double dvz = grad1(v, tid, iz, nz, slab, z_);
+  const double dwx = grad1(w, tid, ix, nx, 1, x_);
+  const double dwy = grad1(w, tid, iy, ny, nx, y_);
+  const double dwz = grad1(w, tid, iz, nz, slab, z_);
 
   if (vorticity || helicity) {
-    const double omx = dwy[i] - dvz[i];
-    const double omy = duz[i] - dwx[i];
-    const double omz = dvx[i] - duy[i];
+    const double omx = dwy - dvz;
+    const double omy = duz - dwx;
+    const double omz = dvx - duy;
     const double omag = sqrt(omx * omx + omy * omy + omz * omz);
     if (vorticity)
-      vorticity[i] = (float)omag;
+      vorticity[tid] = (float)omag;
     if (helicity) {
-      const double ui = u[i], vi = v[i], wi = w[i];
+      const double ui = u[tid], vi = v[tid], wi = w[tid];
       const double h = fabs(omx * ui + omy * vi + omz * wi);
       const double vmag = sqrt(ui * ui + vi * vi + wi * wi);
-      helicity[i] = (vmag > 0.0 && omag > 0.0)
+      helicity[tid] = (vmag > 0.0 && omag > 0.0)
           ? (float)(h / (2.0 * vmag * omag))
           : 0.0f;
     }
   }
-  if (lambda2 || qCriterion) {
-    if (lambda2)
-      lambda2[i] = (float)(-fmin(l2_d(dux[i],
-                                      duy[i],
-                                      duz[i],
-                                      dvx[i],
-                                      dvy[i],
-                                      dvz[i],
-                                      dwx[i],
-                                      dwy[i],
-                                      dwz[i]),
-          0.0));
-    if (qCriterion)
-      qCriterion[i] = (float)fmax(q_crit_d(dux[i],
-                                      duy[i],
-                                      duz[i],
-                                      dvx[i],
-                                      dvy[i],
-                                      dvz[i],
-                                      dwx[i],
-                                      dwy[i],
-                                      dwz[i]),
-          0.0);
-  }
+  if (lambda2)
+    lambda2[tid] = (float)(-fmin(
+        l2_d(dux, duy, duz, dvx, dvy, dvz, dwx, dwy, dwz), 0.0));
+  if (qCriterion)
+    qCriterion[tid] = (float)fmax(
+        q_crit_d(dux, duy, duz, dvx, dvy, dvz, dwx, dwy, dwz), 0.0);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,9 +217,6 @@ void vort_cuda(const float *u,
   // any early-exit path.
   float *d_u{}, *d_v{}, *d_w{};
   double *d_x{}, *d_y{}, *d_z{};
-  double *d_dux{}, *d_dvx{}, *d_dwx{};
-  double *d_duy{}, *d_dvy{}, *d_dwy{};
-  double *d_duz{}, *d_dvz{}, *d_dwz{};
   float *d_vort{}, *d_hel{}, *d_l2{}, *d_qc{};
 
   bool ok = true;
@@ -280,17 +248,6 @@ void vort_cuda(const float *u,
     check(cudaMemcpy(d_z, z_, nz * sizeof(double), cudaMemcpyHostToDevice));
   }
 
-  // Allocate Jacobian scratch (9 × len doubles)
-  check(cudaMalloc(&d_dux, len * sizeof(double)));
-  check(cudaMalloc(&d_dvx, len * sizeof(double)));
-  check(cudaMalloc(&d_dwx, len * sizeof(double)));
-  check(cudaMalloc(&d_duy, len * sizeof(double)));
-  check(cudaMalloc(&d_dvy, len * sizeof(double)));
-  check(cudaMalloc(&d_dwy, len * sizeof(double)));
-  check(cudaMalloc(&d_duz, len * sizeof(double)));
-  check(cudaMalloc(&d_dvz, len * sizeof(double)));
-  check(cudaMalloc(&d_dwz, len * sizeof(double)));
-
   // Allocate output buffers
   if (vorticity)
     check(cudaMalloc(&d_vort, len * sizeof(float)));
@@ -302,35 +259,22 @@ void vort_cuda(const float *u,
     check(cudaMalloc(&d_qc, len * sizeof(float)));
 
   if (ok) {
-    // Compute all 9 Jacobian components (u,v,w) × (x,y,z)
-    grad3D_kernel<<<grid, BLOCK>>>(d_u, d_dux, nx, ny, nz, 0, d_x);
-    grad3D_kernel<<<grid, BLOCK>>>(d_v, d_dvx, nx, ny, nz, 0, d_x);
-    grad3D_kernel<<<grid, BLOCK>>>(d_w, d_dwx, nx, ny, nz, 0, d_x);
-    grad3D_kernel<<<grid, BLOCK>>>(d_u, d_duy, nx, ny, nz, 1, d_y);
-    grad3D_kernel<<<grid, BLOCK>>>(d_v, d_dvy, nx, ny, nz, 1, d_y);
-    grad3D_kernel<<<grid, BLOCK>>>(d_w, d_dwy, nx, ny, nz, 1, d_y);
-    grad3D_kernel<<<grid, BLOCK>>>(d_u, d_duz, nx, ny, nz, 2, d_z);
-    grad3D_kernel<<<grid, BLOCK>>>(d_v, d_dvz, nx, ny, nz, 2, d_z);
-    grad3D_kernel<<<grid, BLOCK>>>(d_w, d_dwz, nx, ny, nz, 2, d_z);
-
-    // Compute vortical quantities from the Jacobian
-    vort_from_jacobians_kernel<<<grid, BLOCK>>>(d_u,
+    // Single fused kernel: computes all 9 Jacobian components per thread in
+    // registers and immediately derives the requested vortical quantities.
+    // Eliminates 9x len*sizeof(double) of intermediate global memory traffic.
+    vort_fused_kernel<<<grid, BLOCK>>>(d_u,
         d_v,
         d_w,
-        d_dux,
-        d_dvx,
-        d_dwx,
-        d_duy,
-        d_dvy,
-        d_dwy,
-        d_duz,
-        d_dvz,
-        d_dwz,
+        d_x,
+        d_y,
+        d_z,
         d_vort,
         d_hel,
         d_l2,
         d_qc,
-        len);
+        nx,
+        ny,
+        nz);
 
     check(cudaDeviceSynchronize());
   }
@@ -356,15 +300,6 @@ void vort_cuda(const float *u,
   cudaFree(d_x);
   cudaFree(d_y);
   cudaFree(d_z);
-  cudaFree(d_dux);
-  cudaFree(d_dvx);
-  cudaFree(d_dwx);
-  cudaFree(d_duy);
-  cudaFree(d_dvy);
-  cudaFree(d_dwy);
-  cudaFree(d_duz);
-  cudaFree(d_dvz);
-  cudaFree(d_dwz);
   cudaFree(d_vort);
   cudaFree(d_hel);
   cudaFree(d_l2);
