@@ -6,6 +6,9 @@
 #include "tsd/core/ColorMapUtil.hpp"
 #include "tsd/core/Logging.hpp"
 #include "tsd/core/algorithms/vort.h"
+#if TSD_USE_CUDA
+#include "vort_cuda.h"
+#endif
 // nanovdb
 #include <nanovdb/NanoVDB.h>
 // anari
@@ -859,8 +862,22 @@ VorticityResult computeVorticity(Scene &scene,
   auto [vorticityArr, vorticityOut] = makeOutBuf(opts.vorticity);
   auto [helicityArr, helicityOut] = makeOutBuf(opts.helicity);
 
-  // Compute — vort() reads float* velocity directly, writes float* outputs.
-  // Null output pointers are silently skipped inside vort().
+  // Compute — writes float* outputs directly; null outputs are skipped.
+#if TSD_USE_CUDA
+  vort_cuda(uData.ptr,
+      vData.ptr,
+      wData.ptr,
+      uData.x.data(),
+      uData.y.data(),
+      uData.z.data(),
+      vorticityOut,
+      helicityOut,
+      lambda2Out,
+      qCritOut,
+      nx,
+      ny,
+      nz);
+#else
   vort(uData.ptr,
       vData.ptr,
       wData.ptr,
@@ -874,6 +891,7 @@ VorticityResult computeVorticity(Scene &scene,
       nx,
       ny,
       nz);
+#endif
 
   // Unmap output arrays before handing them to SpatialField
   if (lambda2Arr)
