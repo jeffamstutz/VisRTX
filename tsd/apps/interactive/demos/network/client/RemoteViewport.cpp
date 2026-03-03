@@ -21,27 +21,35 @@ RemoteViewport::RemoteViewport(Application *app,
     tsd::rendering::Manipulator *m,
     tsd::network::NetworkChannel *c,
     const char *name)
-    : Window(app, name)
+    : BaseViewport(app, name)
 {
+  disconnect();
   setManipulator(m);
   setNetworkChannel(c);
-  setupRenderPipeline();
+  BaseViewport::imagePipeline_setup();
 }
 
 RemoteViewport::~RemoteViewport()
 {
+  disconnect();
+
   if (m_channel)
     m_channel->removeAllHandlers();
+
+  BaseViewport::imagePipeline_teardown();
 }
 
 void RemoteViewport::buildUI()
 {
+  BaseViewport::buildUI();
+
   ImVec2 _viewportSize = ImGui::GetContentRegionAvail();
   tsd::math::int2 viewportSize(_viewportSize.x, _viewportSize.y);
 
   bool isConnected = m_channel && m_channel->isConnected();
+  BaseViewport::viewport_setActive(isConnected);
 
-  if (m_viewportSize != viewportSize || m_wasConnected != isConnected)
+  if (m_viewport.size != viewportSize || m_wasConnected != isConnected)
     reshape(viewportSize);
 
   if (!m_wasConnected && isConnected) {
@@ -49,6 +57,8 @@ void RemoteViewport::buildUI()
     m_receivedRendererIdx = TSD_INVALID_INDEX;
     m_channel->send(MessageType::SERVER_REQUEST_CURRENT_CAMERA);
     m_channel->send(MessageType::SERVER_REQUEST_CURRENT_RENDERER);
+  } else if (m_wasConnected && !isConnected) {
+    disconnect();
   }
 
   m_wasConnected = isConnected;
@@ -56,9 +66,11 @@ void RemoteViewport::buildUI()
 
   updateRenderer();
   updateCamera();
-  m_pipeline.render();
+  BaseViewport::imagePipeline_render();
 
+  ImGui::BeginDisabled(!isConnected);
   ui_menubar();
+  ImGui::EndDisabled();
 
   if (m_outputPass) {
     ImGui::Image((ImTextureID)m_outputPass->getTexture(),
@@ -67,7 +79,8 @@ void RemoteViewport::buildUI()
         ImVec2(1, 0));
   }
 
-  ui_handleInput();
+  BaseViewport::ui_gizmo();
+  BaseViewport::ui_handleInput();
 
   // Render the overlay after input handling so it does not interfere.
   if (m_showOverlay)
@@ -76,7 +89,7 @@ void RemoteViewport::buildUI()
 
 void RemoteViewport::setManipulator(tsd::rendering::Manipulator *m)
 {
-  m_arcball = m ? m : &m_localArcball;
+  m_camera.arcball = m ? m : &m_camera.localArcball;
 }
 
 void RemoteViewport::setNetworkChannel(tsd::network::NetworkChannel *c)
@@ -118,32 +131,49 @@ void RemoteViewport::setNetworkChannel(tsd::network::NetworkChannel *c)
       });
 }
 
-void RemoteViewport::saveSettings(tsd::core::DataNode &root)
+void RemoteViewport::disconnect()
 {
-  root.reset(); // clear all previous values, if they exist
-
-  // Base window settings //
-
-  Window::saveSettings(root);
+  m_receivedRendererIdx = TSD_INVALID_INDEX;
+  m_renderers.current = {};
+  m_renderers.objects.clear();
+  m_prevRenderer = {};
+  m_receivedCameraIdx = TSD_INVALID_INDEX;
+  m_camera.current = {};
+  m_prevCamera = {};
 }
 
-void RemoteViewport::loadSettings(tsd::core::DataNode &root)
+void RemoteViewport::imagePipeline_populate(tsd::rendering::RenderPipeline &p)
 {
-  Window::loadSettings(root);
-}
-
-void RemoteViewport::setupRenderPipeline()
-{
-  m_clearPass = m_pipeline.emplace_back<tsd::rendering::ClearBuffersPass>();
-  m_incomingFramePass =
-      m_pipeline.emplace_back<tsd::rendering::CopyToColorBufferPass>();
-  m_outputPass = m_pipeline.emplace_back<tsd::rendering::CopyToSDLTexturePass>(
+  m_clearPass = p.emplace_back<tsd::rendering::ClearBuffersPass>();
+  m_incomingFramePass = p.emplace_back<tsd::rendering::CopyToColorBufferPass>();
+  m_outputPass = p.emplace_back<tsd::rendering::CopyToSDLTexturePass>(
       m_app->sdlRenderer());
 
   m_clearPass->setClearColor(tsd::math::float4(1.f, 0.f, 0.f, 1.f));
   m_incomingFramePass->setExternalBuffer(m_incomingColorBuffer);
 
-  reshape(m_viewportSize);
+  reshape(m_viewport.size);
+}
+
+void RemoteViewport::camera_resetView(bool /*resetAzEl*/)
+{
+  tsd::core::logWarning(
+      "Camera view reset is not currently supported in RemoteViewport.");
+}
+
+void RemoteViewport::camera_centerView()
+{
+  tsd::core::logWarning(
+      "Camera center view is not currently supported in RemoteViewport.");
+}
+
+void RemoteViewport::renderer_resetParameterDefaults()
+{
+  if (!m_renderers.current)
+    return;
+
+  tsd::core::logWarning(
+      "Renderer parameter reset is not currently supported in RemoteViewport.");
 }
 
 void RemoteViewport::reshape(tsd::math::int2 newSize)
@@ -151,8 +181,6 @@ void RemoteViewport::reshape(tsd::math::int2 newSize)
   if (newSize.x <= 0 || newSize.y <= 0)
     return;
 
-  m_viewportSize = newSize;
-  m_pipeline.setDimensions(newSize.x, newSize.y);
   m_incomingColorBuffer.resize(newSize.x * newSize.y * 4);
   std::fill(m_incomingColorBuffer.begin(), m_incomingColorBuffer.end(), 0);
 
@@ -165,173 +193,91 @@ void RemoteViewport::reshape(tsd::math::int2 newSize)
 
 void RemoteViewport::updateRenderer()
 {
-  if (!m_channel || !m_channel->isConnected()) {
-    m_rendererObjects.clear();
-    m_currentRenderer.reset();
+  if (!m_channel || !m_channel->isConnected())
     return;
-  }
 
   auto *core = appCore();
   auto &scene = core->tsd.scene;
-  if (m_rendererObjects.empty() && scene.numberOfObjects(ANARI_RENDERER) != 0) {
+  if (m_renderers.objects.empty()
+      && scene.numberOfObjects(ANARI_RENDERER) != 0) {
     auto fr = scene.getObject<tsd::core::Renderer>(0);
-    m_rendererObjects = scene.renderersOfDevice(fr->rendererDeviceName());
-  } else {
+    m_renderers.objects = scene.renderersOfDevice(fr->rendererDeviceName());
+  } else if (m_renderers.objects.empty()) {
     // We only update when we have the list of renderers from the server
     return;
   }
 
-  const bool doUpdate =
-      (!m_currentRenderer && m_receivedRendererIdx != TSD_INVALID_INDEX)
-      || (m_currentRenderer
-          && m_currentRenderer->index() != m_receivedRendererIdx);
+  const bool rendererFromServer =
+      !m_renderers.current && m_receivedRendererIdx != TSD_INVALID_INDEX;
+  const bool rendererChanged = m_renderers.current != m_prevRenderer;
 
-  if (doUpdate) {
-    m_currentRenderer = m_receivedRendererIdx >= m_rendererObjects.size()
+  if (rendererFromServer) {
+    m_renderers.current = m_receivedRendererIdx >= m_renderers.objects.size()
         ? tsd::core::RendererAppRef{}
-        : m_rendererObjects[m_receivedRendererIdx];
+        : m_renderers.objects[m_receivedRendererIdx];
+    m_prevRenderer = m_renderers.current;
+  } else if (rendererChanged) {
+    auto currentIdx =
+        m_renderers.current ? m_renderers.current->index() : TSD_INVALID_INDEX;
+    m_receivedRendererIdx = currentIdx;
+    m_channel->send(MessageType::SERVER_SET_CURRENT_RENDERER, &currentIdx);
+    m_prevRenderer = m_renderers.current;
   }
 }
 
 void RemoteViewport::updateCamera()
 {
-  if (!m_channel || !m_channel->isConnected()) {
-    m_currentCamera.reset();
+  if (!m_channel || !m_channel->isConnected())
     return;
-  }
 
-  const bool doUpdate =
-      (!m_currentCamera && m_receivedCameraIdx != TSD_INVALID_INDEX)
-      || (m_currentCamera && m_currentCamera->index() != m_receivedCameraIdx);
+  const bool cameraFromServer =
+      !m_camera.current && m_receivedCameraIdx != TSD_INVALID_INDEX;
+  const bool cameraChanged = m_camera.current != m_prevCamera;
 
-  if (doUpdate) {
+  if (cameraFromServer) {
     auto *core = appCore();
     auto &scene = core->tsd.scene;
-    m_currentCamera = scene.getObject<tsd::core::Camera>(m_receivedCameraIdx);
+    m_camera.current = scene.getObject<tsd::core::Camera>(m_receivedCameraIdx);
+    m_camera.arcballToken = {};
     m_manipulatorSynchronized = false;
     return;
+  } else if (cameraChanged) {
+    auto currentIdx =
+        m_camera.current ? m_camera.current->index() : TSD_INVALID_INDEX;
+    m_receivedCameraIdx = currentIdx;
+    m_channel->send(MessageType::SERVER_SET_CURRENT_CAMERA, &currentIdx);
+    m_prevCamera = m_camera.current;
+    m_camera.arcballToken = {};
+    m_manipulatorSynchronized = false;
   }
 
-  if (!m_manipulatorSynchronized && m_currentCamera
-      && m_currentCamera->numMetadata() > 0) {
-    tsd::rendering::updateManipulatorFromCamera(*m_arcball, *m_currentCamera);
+  if (!m_manipulatorSynchronized && m_camera.current
+      && m_camera.current->numMetadata() > 0) {
+    tsd::rendering::updateManipulatorFromCamera(
+        *m_camera.arcball, *m_camera.current);
     m_manipulatorSynchronized = true;
   }
 
-  if (!m_manipulatorSynchronized || !m_arcball->hasChanged(m_cameraToken))
+  if (!m_manipulatorSynchronized
+      || !m_camera.arcball->hasChanged(m_camera.arcballToken))
     return;
 
-  tsd::rendering::updateCameraObject(*m_currentCamera, *m_arcball);
+  tsd::rendering::updateCameraObject(*m_camera.current, *m_camera.arcball);
 }
 
 void RemoteViewport::ui_menubar()
 {
   if (ImGui::BeginMenuBar()) {
-    // Viewport //
-
     if (ImGui::BeginMenu("Viewport")) {
       ImGui::Checkbox("show info overlay", &m_showOverlay);
       ImGui::EndMenu();
     }
 
-    // Renderer //
-
-    ImGui::BeginDisabled(m_rendererObjects.empty());
-    if (ImGui::BeginMenu("Renderer")) {
-      if (m_rendererObjects.size() > 1) {
-        ImGui::Text("Subtype:");
-        ImGui::Indent(INDENT_AMOUNT);
-        for (int i = 0; i < m_rendererObjects.size(); i++) {
-          auto &ro = m_rendererObjects[i];
-          const char *rName = ro->subtype().c_str();
-          if (ImGui::RadioButton(rName, m_currentRenderer == ro)) {
-            m_currentRenderer = ro;
-            auto idx = m_receivedRendererIdx = ro->index();
-            m_channel->send(MessageType::SERVER_SET_CURRENT_RENDERER, &idx);
-          }
-        }
-        ImGui::Unindent(INDENT_AMOUNT);
-      }
-
-      ImGui::Separator();
-
-      if (!m_rendererObjects.empty()) {
-        ImGui::Text("Parameters:");
-        ImGui::Indent(INDENT_AMOUNT);
-        tsd::ui::buildUI_object(*m_currentRenderer, appCore()->tsd.scene, true);
-        ImGui::Unindent(INDENT_AMOUNT);
-      }
-      ImGui::EndMenu();
-    }
-    ImGui::EndDisabled();
+    BaseViewport::ui_menubar_Renderer();
+    BaseViewport::ui_menubar_Camera();
+    BaseViewport::ui_menubar_TransformManipulator();
 
     ImGui::EndMenuBar();
-  }
-}
-
-void RemoteViewport::ui_handleInput()
-{
-  // Do not bother with events if the window is not hovered
-  // or no interaction is ongoing.
-  // We'll use that hovering status to check for starting an
-  // event below.
-  if (!ImGui::IsWindowHovered() && !m_manipulating)
-    return;
-
-  ImGuiIO &io = ImGui::GetIO();
-
-  const bool dolly = ImGui::IsMouseDown(ImGuiMouseButton_Right)
-      || (ImGui::IsMouseDown(ImGuiMouseButton_Left)
-          && ImGui::IsKeyDown(ImGuiKey_LeftShift));
-  const bool pan = ImGui::IsMouseDown(ImGuiMouseButton_Middle)
-      || (ImGui::IsMouseDown(ImGuiMouseButton_Left)
-          && ImGui::IsKeyDown(ImGuiKey_LeftAlt));
-  const bool orbit = ImGui::IsMouseDown(ImGuiMouseButton_Left);
-
-  const bool anyMovement = dolly || pan || orbit;
-  if (!anyMovement) {
-    m_manipulating = false;
-    m_previousMouse = tsd::math::float2(-1);
-  } else if (ImGui::IsItemHovered() && !m_manipulating) {
-    m_manipulating = true;
-    ImGui::SetWindowFocus(); // ensure we keep focus while manipulating
-  }
-
-  if (m_mouseRotating && !orbit)
-    m_mouseRotating = false;
-
-  if (m_manipulating) {
-    tsd::math::float2 position;
-    std::memcpy(&position, &io.MousePos, sizeof(position));
-
-    const tsd::math::float2 mouse(position.x, position.y);
-
-    if (anyMovement && m_previousMouse != tsd::math::float2(-1)) {
-      const tsd::math::float2 prev = m_previousMouse;
-
-      const tsd::math::float2 mouseFrom =
-          prev * 2.f / tsd::math::float2(m_viewportSize);
-      const tsd::math::float2 mouseTo =
-          mouse * 2.f / tsd::math::float2(m_viewportSize);
-
-      const tsd::math::float2 mouseDelta = mouseTo - mouseFrom;
-
-      if (mouseDelta != tsd::math::float2(0.f)) {
-        if (orbit && !(pan || dolly)) {
-          if (!m_mouseRotating) {
-            m_arcball->startNewRotation();
-            m_mouseRotating = true;
-          }
-
-          m_arcball->rotate(mouseDelta);
-        } else if (dolly)
-          m_arcball->zoom(mouseDelta.y);
-        else if (pan)
-          m_arcball->pan(mouseDelta);
-      }
-    }
-
-    m_previousMouse = mouse;
   }
 }
 
@@ -351,16 +297,11 @@ void RemoteViewport::ui_overlay()
   // This ensures it's properly occluded when other windows are on top.
   if (ImGui::BeginChild(
           "##viewportOverlay", ImVec2(0, 0), childFlags, childWindowFlags)) {
-    ImGui::Text("viewport: %i x %i", m_viewportSize.x, m_viewportSize.y);
+    ImGui::Text("viewport: %i x %i", m_viewport.size.x, m_viewport.size.y);
   }
   ImGui::EndChild();
 
   ImGui::PopStyleColor();
-}
-
-int RemoteViewport::windowFlags() const
-{
-  return ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoScrollbar;
 }
 
 } // namespace tsd::ui::imgui

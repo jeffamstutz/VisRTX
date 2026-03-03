@@ -5,7 +5,7 @@
 
 // tsd_ui_imgui
 #include "tsd/ui/imgui/tsd_ui_imgui.h"
-#include "tsd/ui/imgui/windows/Window.h"
+#include "tsd/ui/imgui/windows/BaseViewport.h"
 // tsd_rendering
 #include "tsd/rendering/pipeline/RenderPipeline.h"
 #include "tsd/rendering/view/Manipulator.hpp"
@@ -18,7 +18,7 @@ using tsd::network::MessageType;
 
 namespace tsd::ui::imgui {
 
-struct RemoteViewport : public Window
+struct RemoteViewport : public BaseViewport
 {
   RemoteViewport(Application *app,
       tsd::rendering::Manipulator *m,
@@ -29,43 +29,36 @@ struct RemoteViewport : public Window
   void buildUI() override;
   void setManipulator(tsd::rendering::Manipulator *m);
   void setNetworkChannel(tsd::network::NetworkChannel *c);
+  void disconnect();
 
  private:
-  void saveSettings(tsd::core::DataNode &thisWindowRoot) override;
-  void loadSettings(tsd::core::DataNode &thisWindowRoot) override;
+  void imagePipeline_populate(tsd::rendering::RenderPipeline &p) override;
 
-  void setupRenderPipeline();
+  void camera_resetView(bool resetAzEl = true) override;
+  void camera_centerView() override;
+
+  void renderer_resetParameterDefaults() override;
+
   void reshape(tsd::math::int2 newWindowSize);
 
   void updateRenderer();
   void updateCamera();
 
   void ui_menubar();
-  void ui_handleInput();
   void ui_overlay();
-
-  int windowFlags() const override; // anari_viewer::Window
 
   // Data /////////////////////////////////////////////////////////////////////
 
   bool m_wasConnected{false};
-
-  tsd::math::float2 m_previousMouse{-1.f, -1.f};
-  bool m_mouseRotating{false};
-  bool m_manipulating{false};
   bool m_showOverlay{true};
 
-  std::vector<tsd::core::RendererAppRef> m_rendererObjects;
-  tsd::core::RendererAppRef m_currentRenderer;
-  tsd::core::CameraAppRef m_currentCamera;
   size_t m_receivedRendererIdx{TSD_INVALID_INDEX};
   size_t m_receivedCameraIdx{TSD_INVALID_INDEX};
+  tsd::core::RendererAppRef m_prevRenderer;
+  tsd::core::CameraAppRef m_prevCamera;
 
   // Camera manipulator //
 
-  tsd::rendering::Manipulator m_localArcball;
-  tsd::rendering::Manipulator *m_arcball{nullptr};
-  tsd::rendering::UpdateToken m_cameraToken{0};
   bool m_manipulatorSynchronized{false};
 
   // Networking //
@@ -76,12 +69,9 @@ struct RemoteViewport : public Window
 
   std::vector<uint8_t> m_incomingColorBuffer;
 
-  tsd::rendering::RenderPipeline m_pipeline;
   tsd::rendering::ClearBuffersPass *m_clearPass{nullptr};
   tsd::rendering::CopyToColorBufferPass *m_incomingFramePass{nullptr};
   tsd::rendering::CopyToSDLTexturePass *m_outputPass{nullptr};
-
-  tsd::math::int2 m_viewportSize{0, 0};
 };
 
 } // namespace tsd::ui::imgui

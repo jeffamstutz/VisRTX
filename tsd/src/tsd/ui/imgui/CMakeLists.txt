@@ -17,6 +17,7 @@ project_sources(PRIVATE
   modals/CuttingPlaneDialog.cpp
   modals/VorticityDialog.cpp
   windows/Animations.cpp
+  windows/BaseViewport.cpp
   windows/CameraPoses.cpp
   windows/DatabaseEditor.cpp
   windows/IsosurfaceEditor.cpp

@@ -320,6 +320,7 @@ void Application::disconnect()
 {
   tsd::core::logStatus("[Client] Disconnecting from server...");
   m_updateDelegate->setEnabled(false);
+  m_viewport->disconnect();
   m_client->send(MessageType::DISCONNECT).get();
   m_client->disconnect();
 
@@ -327,7 +328,6 @@ void Application::disconnect()
   core->tsd.sceneLoadComplete = false;
   core->clearSelected();
   auto &scene = core->tsd.scene;
-  scene.removeAllLayers();
   scene.removeAllObjects();
 }
 

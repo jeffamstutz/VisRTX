@@ -141,7 +141,6 @@ void RenderServer::setup_Camera()
   tsd::rendering::Manipulator manipulator;
   manipulator.setConfig(m_renderIndex->computeDefaultView());
   tsd::rendering::updateCameraObject(*m_camera, manipulator, true);
-  printf("SERVER NUM CAMERA METADATA: %zu\n", m_camera->numMetadata());
 }
 
 void RenderServer::setup_RenderPipeline()

@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "Window.h"
+#include "BaseViewport.h"
 
 #include "tsd/ui/imgui/tsd_ui_imgui.h"
 // tsd_core
@@ -15,8 +15,6 @@
 #include "tsd/rendering/pipeline/RenderPipeline.h"
 #include "tsd/rendering/view/CameraUpdateDelegate.hpp"
 #include "tsd/rendering/view/Manipulator.hpp"
-// ImGuizmo
-#include <ImGuizmo.h>
 // std
 #include <array>
 #include <functional>
@@ -30,7 +28,7 @@ namespace tsd::ui::imgui {
 
 using ViewportDeviceChangeCb = std::function<void(const std::string &)>;
 
-struct Viewport : public Window
+struct Viewport : public BaseViewport
 {
   Viewport(Application *app,
       tsd::rendering::Manipulator *m,
@@ -38,7 +36,6 @@ struct Viewport : public Window
   ~Viewport();
 
   void buildUI() override;
-  void setManipulator(tsd::rendering::Manipulator *m);
   void resetView(bool resetAzEl = true);
   void centerView();
   void setLibrary(const std::string &libName, bool doAsync = true);
@@ -52,45 +49,37 @@ struct Viewport : public Window
   void saveSettings(tsd::core::DataNode &thisWindowRoot) override;
   void loadSettings(tsd::core::DataNode &thisWindowRoot) override;
 
-  void setupRenderPipeline();
+  void imagePipeline_populate(tsd::rendering::RenderPipeline &p) override;
+
+  void camera_resetView(bool resetAzEl = true) override;
+  void camera_centerView() override;
+
+  void renderer_resetParameterDefaults() override;
+
   void teardownDevice();
-  void reshape(tsd::math::int2 newWindowSize);
   void pick(tsd::math::int2 location, bool selectObject);
   void setSelectionVisibilityFilterEnabled(bool enabled);
 
   void updateFrame();
-  void updateCamera(bool force = false);
   void updateImage();
+  void updateAxes();
 
   void ui_menubar();
   void ui_menubar_Device();
-  void ui_menubar_Renderer();
   void ui_menubar_Camera();
-  void ui_menubar_TransformManipulator();
   void ui_menubar_Viewport();
   void ui_menubar_World();
 
-  void ui_handleInput();
   bool ui_picking();
   void ui_overlay();
-  void ui_gizmo();
-
-  bool canShowGizmo() const;
-
-  int windowFlags() const override; // anari_viewer::Window
 
   // Data /////////////////////////////////////////////////////////////////////
 
   ViewportDeviceChangeCb m_deviceChangeCb;
   float m_timeToLoadDevice{0.f};
   std::future<void> m_initFuture;
-  bool m_deviceReadyToUse{false};
   std::string m_libName;
   tsd::rendering::RenderIndex *m_rIdx{nullptr};
-
-  tsd::math::float2 m_previousMouse{-1.f, -1.f};
-  bool m_mouseRotating{false};
-  bool m_manipulating{false};
 
   bool m_showOverlay{true};
   bool m_showAxes{true};
@@ -104,12 +93,6 @@ struct Viewport : public Window
   float m_edgeThreshold{0.5f};
   bool m_edgeInvert{false};
 
-  // Gizmo state //
-
-  bool m_enableGizmo{true};
-  ImGuizmo::OPERATION m_gizmoOperation{ImGuizmo::TRANSLATE};
-  ImGuizmo::MODE m_gizmoMode{ImGuizmo::WORLD};
-
   // Picking state //
 
   bool m_selectObjectNextPick{false};
@@ -119,16 +102,9 @@ struct Viewport : public Window
   // ANARI objects //
 
   anari::Device m_device{nullptr};
-  std::vector<tsd::core::RendererAppRef> m_rendererObjects;
-  tsd::core::RendererAppRef m_currentRenderer;
-
-  // Camera manipulator //
-
-  tsd::core::CameraAppRef m_currentCamera;
-
-  tsd::rendering::Manipulator m_localArcball;
-  tsd::rendering::Manipulator *m_arcball{nullptr};
-  tsd::rendering::UpdateToken m_cameraToken{0};
+  tsd::core::RendererAppRef m_prevRenderer;
+  tsd::core::CameraAppRef m_prevCamera;
+  tsd::core::ObjectVersion m_lastCameraChange{};
 
   // Display //
 
@@ -140,10 +116,6 @@ struct Viewport : public Window
   tsd::rendering::AnariAxesRenderPass *m_axesPass{nullptr};
   tsd::rendering::CopyToSDLTexturePass *m_outputPass{nullptr};
   tsd::rendering::SaveToFilePass *m_saveToFilePass{nullptr};
-
-  tsd::math::int2 m_viewportSize{0, 0};
-  tsd::math::int2 m_renderSize{0, 0};
-  float m_resolutionScale{1.f};
 
   float m_latestFL{0.f};
   float m_latestAnariFL{0.f};
