@@ -10,6 +10,7 @@
 #include "modals/ExportNanoVDBFileDialog.h"
 #include "modals/ImportFileDialog.h"
 #include "modals/OfflineRenderModal.h"
+#include "modals/CuttingPlaneDialog.h"
 #include "modals/VorticityDialog.h"
 // tsd_app
 #include "tsd/app/Core.h"
@@ -119,6 +120,7 @@ class Application : public anari_viewer::Application
   std::unique_ptr<ImportFileDialog> m_fileDialog;
   std::unique_ptr<ExportNanoVDBFileDialog> m_exportNanoVDBFileDialog;
   std::unique_ptr<VorticityDialog> m_vorticityDialog;
+  std::unique_ptr<CuttingPlaneDialog> m_cuttingPlaneDialog;
 
   tsd::core::DataTree m_settings;
 

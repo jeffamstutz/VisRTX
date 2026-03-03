@@ -129,6 +129,7 @@ anari_viewer::WindowArray Application::setupWindows()
   m_fileDialog = std::make_unique<ImportFileDialog>(this);
   m_exportNanoVDBFileDialog = std::make_unique<ExportNanoVDBFileDialog>(this);
   m_vorticityDialog = std::make_unique<VorticityDialog>(this);
+  m_cuttingPlaneDialog = std::make_unique<CuttingPlaneDialog>(this);
 
   m_applicationName = SDL_GetWindowTitle(sdlWindow());
   updateWindowTitle();
@@ -190,6 +191,11 @@ void Application::uiFrameStart()
 
   if (m_vorticityDialog->visible()) {
     m_vorticityDialog->renderUI();
+    modalActive = true;
+  }
+
+  if (m_cuttingPlaneDialog->visible()) {
+    m_cuttingPlaneDialog->renderUI();
     modalActive = true;
   }
 
@@ -343,6 +349,9 @@ void Application::uiMainMenuBar_Tools()
 
     if (ImGui::MenuItem("Flow Analysis"))
       m_vorticityDialog->show();
+
+    if (ImGui::MenuItem("Cutting Plane"))
+      m_cuttingPlaneDialog->show();
 
     ImGui::Separator();
 
