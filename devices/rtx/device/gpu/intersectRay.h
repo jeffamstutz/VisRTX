@@ -104,11 +104,11 @@ VISRTX_DEVICE void intersectVolume(ScreenSample &ss,
 
 // Apply a cutting plane to a ray.
 // The plane is encoded as vec4(N.x, N.y, N.z, d) where the visible half-space
-// is { p | dot(N,p)+d >= 0 }.  Disabled when w <= -1e28f (sentinel).
+// is { p | dot(N,p)+d >= 0 }.  Disabled when cp == vec4(0) (GPU default).
 // Modifies ray.org and ray.t.upper in place.
 VISRTX_DEVICE void applyCuttingPlane(const vec4 &cp, Ray &ray)
 {
-  if (cp.w <= -1e28f)
+  if (cp == vec4(0.f))
     return;
   const vec3 N(cp.x, cp.y, cp.z);
   const float dist_org = glm::dot(N, ray.org) + cp.w;

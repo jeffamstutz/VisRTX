@@ -201,7 +201,7 @@
           ],
           "tags": [],
           "default": [0.0, 0.0, 0.0, -1e30],
-          "description": "cutting plane equation (nx, ny, nz, d); disabled when w <= -1e28"
+          "description": "cutting plane equation (nx, ny, nz, d); disabled when all zero (vec4(0))"
         }
       ]
     },
@@ -337,7 +337,7 @@
           ],
           "tags": [],
           "default": [0.0, 0.0, 0.0, -1e30],
-          "description": "cutting plane equation (nx, ny, nz, d); disabled when w <= -1e28"
+          "description": "cutting plane equation (nx, ny, nz, d); disabled when all zero (vec4(0))"
         }
       ]
     },
@@ -432,7 +432,7 @@
           ],
           "tags": [],
           "default": [0.0, 0.0, 0.0, -1e30],
-          "description": "cutting plane equation (nx, ny, nz, d); disabled when w <= -1e28"
+          "description": "cutting plane equation (nx, ny, nz, d); disabled when all zero (vec4(0))"
         }
       ]
     },

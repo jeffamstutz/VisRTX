@@ -354,7 +354,7 @@ VISRTX_DEVICE void cullCutPlane()
   auto &ss = screenSample();
   auto &fd = *ss.frameData;
   const auto &cp = fd.renderer.cutPlane;
-  if (cp.w <= -1e28f)
+  if (cp == vec4(0.f))
     return;
   const vec3 N(cp.x, cp.y, cp.z);
   const vec3 hitPos = hitpoint();

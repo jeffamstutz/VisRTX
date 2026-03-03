@@ -170,7 +170,7 @@ void Renderer::commitParameters()
   m_volumeSamplingRate =
       std::clamp(getParam<float>("volumeSamplingRate", 0.125f), 1e-3f, 10.f);
   m_premultiplyBackground = getParam<bool>("premultiplyBackground", false);
-  m_cutPlane = getParam<vec4>("cutPlane", vec4(0.f, 0.f, 0.f, -1e30f));
+  m_cutPlane = getParam<vec4>("cutPlane", vec4(0.f));
   if (m_checkerboard)
     m_spp = 1;
 }
