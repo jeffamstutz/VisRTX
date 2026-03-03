@@ -265,30 +265,7 @@ VISRTX_GLOBAL void __raygen__()
     bool isVeryFirstRay = i == 0 && ss.frameData->fb.frameID == 0;
     auto ray = makePrimaryRay(ss, isVeryFirstRay);
 
-    // Apply cutting plane (disabled sentinel: w <= -1e28f)
-    {
-      const auto &cp = rendererParams.cutPlane;
-      if (cp.w > -1e28f) {
-        const vec3 N(cp.x, cp.y, cp.z);
-        const float dist_org = glm::dot(N, ray.org) + cp.w;
-        const float denom = glm::dot(N, ray.dir);
-        if (dist_org >= 0.f) {
-          // camera on visible side: clip where ray exits the half-space
-          if (denom < 0.f) {
-            float t_cut = -dist_org / denom;
-            ray.t.upper = glm::min(ray.t.upper, t_cut);
-          }
-        } else {
-          // camera on invisible side: advance origin to where ray enters
-          if (denom > 0.f) {
-            float t_entry = -dist_org / denom;
-            ray.org += t_entry * ray.dir;
-          } else {
-            ray.t.upper = 0.f; // ray never enters visible half-space
-          }
-        }
-      }
-    }
+    applyCuttingPlane(rendererParams.cutPlane, ray);
 
     SampleDetails sample = {
         vec3(0.0f), 0.0f, vec3(0.0f), ray.t.upper, vec3(0.0f)};

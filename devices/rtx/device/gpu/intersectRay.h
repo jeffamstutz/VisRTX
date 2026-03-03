@@ -102,4 +102,32 @@ VISRTX_DEVICE void intersectVolume(ScreenSample &ss,
   detail::launchRay(ss, r, rayType, false, dataPtr, optixFlags);
 }
 
+// Apply a cutting plane to a ray.
+// The plane is encoded as vec4(N.x, N.y, N.z, d) where the visible half-space
+// is { p | dot(N,p)+d >= 0 }.  Disabled when w <= -1e28f (sentinel).
+// Modifies ray.org and ray.t.upper in place.
+VISRTX_DEVICE void applyCuttingPlane(const vec4 &cp, Ray &ray)
+{
+  if (cp.w <= -1e28f)
+    return;
+  const vec3 N(cp.x, cp.y, cp.z);
+  const float dist_org = glm::dot(N, ray.org) + cp.w;
+  const float denom = glm::dot(N, ray.dir);
+  if (dist_org >= 0.f) {
+    // camera on visible side: clip where ray exits the half-space
+    if (denom < 0.f) {
+      float t_cut = -dist_org / denom;
+      ray.t.upper = glm::min(ray.t.upper, t_cut);
+    }
+  } else {
+    // camera on invisible side: advance origin to where ray enters
+    if (denom > 0.f) {
+      float t_entry = -dist_org / denom;
+      ray.org += t_entry * ray.dir;
+    } else {
+      ray.t.upper = 0.f; // ray never enters visible half-space
+    }
+  }
+}
+
 } // namespace visrtx
