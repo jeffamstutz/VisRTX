@@ -16,6 +16,7 @@ project_add_executable(
   test_Material.cpp
   test_Math.cpp
   test_Object.cpp
+  test_ObjectUsePtr.cpp
   test_Parameter.cpp
   test_Token.cpp
 )
@@ -30,5 +31,6 @@ add_test(NAME tsd::ObjectPool    COMMAND ${PROJECT_NAME} "[ObjectPool]"   )
 add_test(NAME tsd::Material      COMMAND ${PROJECT_NAME} "[Material]"     )
 add_test(NAME tsd::Math          COMMAND ${PROJECT_NAME} "[Math]"         )
 add_test(NAME tsd::Object        COMMAND ${PROJECT_NAME} "[Object]"       )
+add_test(NAME tsd::ObjectUsePtr  COMMAND ${PROJECT_NAME} "[ObjectUsePtr]" )
 add_test(NAME tsd::Parameter     COMMAND ${PROJECT_NAME} "[Parameter]"    )
 add_test(NAME tsd::Token         COMMAND ${PROJECT_NAME} "[Token]"        )
