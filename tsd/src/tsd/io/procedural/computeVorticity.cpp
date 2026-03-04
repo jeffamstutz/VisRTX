@@ -489,10 +489,10 @@ static VolumeRef wrapAsVolume(Scene &scene,
 }
 
 // ---------------------------------------------------------------------------
-// Unstructured path — only compiled when VTK is available
+// Unstructured path — CUDA (Green-Gauss) or VTK CPU fallback
 // ---------------------------------------------------------------------------
 
-#if TSD_USE_VTK
+#if TSD_USE_CUDA || TSD_USE_VTK
 
 static VorticityResult computeVorticityUnstructured(Scene &scene,
     const SpatialField *u,
@@ -577,6 +577,114 @@ static VorticityResult computeVorticityUnstructured(Scene &scene,
       "[computeVorticity] computing vortical quantities on %zu-point "
       "unstructured grid...",
       numPoints);
+
+#if TSD_USE_CUDA
+
+  // CUDA path: Green-Gauss gradient + full-resolution unstructured output.
+
+  // Build vertex-to-cell CSR adjacency on the CPU.
+  std::vector<uint32_t> vtxCellOffsets(numPoints + 1, 0);
+  for (size_t ci = 0; ci < numCells; ++ci) {
+    size_t start = cellIndex[ci];
+    size_t end = (ci + 1 < numCells) ? cellIndex[ci + 1] : connSize;
+    for (size_t j = start; j < end; ++j)
+      vtxCellOffsets[connectivity[j] + 1]++;
+  }
+  for (size_t vv = 1; vv <= numPoints; ++vv)
+    vtxCellOffsets[vv] += vtxCellOffsets[vv - 1];
+  std::vector<uint32_t> vtxCellList(vtxCellOffsets[numPoints]);
+  {
+    std::vector<uint32_t> tmp(vtxCellOffsets.begin(), vtxCellOffsets.end());
+    for (size_t ci = 0; ci < numCells; ++ci) {
+      size_t start = cellIndex[ci];
+      size_t end = (ci + 1 < numCells) ? cellIndex[ci + 1] : connSize;
+      for (size_t j = start; j < end; ++j) {
+        uint32_t vv = connectivity[j];
+        vtxCellList[tmp[vv]++] = (uint32_t)ci;
+      }
+    }
+  }
+
+  // Allocate ANARI output arrays and map host pointers for in-place fill.
+  auto makeOutBuf = [&](bool enabled) -> std::pair<ArrayRef, float *> {
+    if (!enabled)
+      return {};
+    auto arr = scene.createArray(ANARI_FLOAT32, numPoints);
+    return {arr, arr->mapAs<float>()};
+  };
+  auto [vorticityArr, vorticityOut] = makeOutBuf(opts.vorticity);
+  auto [helicityArr, helicityOut] = makeOutBuf(opts.helicity);
+  auto [lambda2Arr, lambda2Out] = makeOutBuf(opts.lambda2);
+  auto [qCritArr, qCritOut] = makeOutBuf(opts.qCriterion);
+
+  // positions: posArr stores float3 elements (x,y,z interleaved).
+  const float *positions = reinterpret_cast<const float *>(posArr->data());
+
+  vort_cuda_unstructured(positions,
+      uPtr,
+      vPtr,
+      wPtr,
+      connectivity,
+      cellIndex,
+      cellTypeData,
+      vtxCellOffsets.data(),
+      vtxCellList.data(),
+      numPoints,
+      numCells,
+      connSize,
+      vorticityOut,
+      helicityOut,
+      lambda2Out,
+      qCritOut);
+
+  if (vorticityArr)
+    vorticityArr->unmap();
+  if (helicityArr)
+    helicityArr->unmap();
+  if (lambda2Arr)
+    lambda2Arr->unmap();
+  if (qCritArr)
+    qCritArr->unmap();
+
+  // Wrap each output as an unstructured SpatialField sharing the topology
+  // arrays from the u-field.  wrapFieldAsVolume adds the transfer function.
+  auto makeUnstrField =
+      [&](const std::string &name, ArrayRef &arr) -> SpatialFieldRef {
+    if (!arr)
+      return {};
+    auto f =
+        scene.createObject<SpatialField>(tokens::spatial_field::unstructured);
+    f->setName(name.c_str());
+    f->setParameterObject("vertex.position", *posArr);
+    f->setParameterObject("index", *connArr);
+    f->setParameterObject("cell.index", *cellIdxArr);
+    f->setParameterObject("cell.type", *cellTypeArr);
+    f->setParameterObject("vertex.data", *arr);
+    return f;
+  };
+
+  logStatus("[computeVorticity] creating output volumes...");
+  if (vorticityArr) {
+    auto f = makeUnstrField("vorticity", vorticityArr);
+    result.vorticity = wrapFieldAsVolume(scene, "vorticity", f, location);
+  }
+  if (helicityArr) {
+    auto f = makeUnstrField("helicity", helicityArr);
+    result.helicity = wrapFieldAsVolume(scene, "helicity", f, location);
+  }
+  if (lambda2Arr) {
+    auto f = makeUnstrField("lambda2", lambda2Arr);
+    result.lambda2 = wrapFieldAsVolume(scene, "lambda2", f, location);
+  }
+  if (qCritArr) {
+    auto f = makeUnstrField("q_criterion", qCritArr);
+    result.qCriterion = wrapFieldAsVolume(scene, "q_criterion", f, location);
+  }
+  logStatus("[computeVorticity] done.");
+
+#elif TSD_USE_VTK
+
+  // VTK CPU fallback: vtkGradientFilter + vtkProbeFilter resample to 64³.
 
   // Step 4: reconstruct vtkUnstructuredGrid
   auto vgrid = vtkSmartPointer<vtkUnstructuredGrid>::New();
@@ -791,10 +899,13 @@ static VorticityResult computeVorticityUnstructured(Scene &scene,
   result.helicity = wrapResampled("helicity", opts.helicity);
 
   logStatus("[computeVorticity] done.");
+
+#endif // TSD_USE_CUDA || TSD_USE_VTK (inner)
+
   return result;
 }
 
-#endif // TSD_USE_VTK
+#endif // TSD_USE_CUDA || TSD_USE_VTK
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -809,7 +920,7 @@ VorticityResult computeVorticity(Scene &scene,
 {
   VorticityResult result;
 
-#if TSD_USE_VTK
+#if TSD_USE_CUDA || TSD_USE_VTK
   if (u && u->subtype() == tokens::spatial_field::unstructured)
     return computeVorticityUnstructured(scene, u, v, w, location, opts);
 #endif
