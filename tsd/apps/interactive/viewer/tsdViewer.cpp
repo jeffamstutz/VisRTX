@@ -13,6 +13,7 @@
 #include <tsd/ui/imgui/windows/Log.h>
 #include <tsd/ui/imgui/windows/ObjectEditor.h>
 #include <tsd/ui/imgui/windows/Terminal.h>
+#include <tsd/ui/imgui/windows/Timeline.h>
 #include <tsd/ui/imgui/windows/TransferFunctionEditor.h>
 #include <tsd/ui/imgui/windows/Viewport.h>
 
@@ -41,6 +42,7 @@ class Application : public TSDApplication
     auto *viewport2 =
         new tsd_ui::Viewport(this, &core->view.manipulator, "Secondary View");
     auto *animations = new tsd_ui::Animations(this);
+    auto *timeline = new tsd_ui::Timeline(this);
     auto *cameras = new tsd_ui::CameraPoses(this);
     auto *log = new tsd_ui::Log(this);
     auto *dbeditor = new tsd_ui::DatabaseEditor(this);
@@ -51,6 +53,7 @@ class Application : public TSDApplication
     auto *terminal = new tsd_ui::Terminal(this);
 
     windows.emplace_back(animations);
+    windows.emplace_back(timeline);
     windows.emplace_back(cameras);
     windows.emplace_back(viewport);
     windows.emplace_back(viewport2);
@@ -68,6 +71,7 @@ class Application : public TSDApplication
       viewport2->hide();
     tfeditor->hide();
     isoeditor->hide();
+    timeline->hide();
 
     // Populate scene //
 

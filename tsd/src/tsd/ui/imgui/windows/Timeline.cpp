@@ -193,19 +193,38 @@ void Timeline::buildUI_canvas()
     }
 
     if (ImGui::BeginPopup("##add_track_popup")) {
-      ImGui::Text("Select a node to animate:");
+      ImGui::Text("Select a transform node to animate:");
       ImGui::Separator();
 
-      auto *layer = scene.defaultLayer();
-      if (layer) {
-        layer->traverse(layer->root(), [&](tsd::core::LayerNode &node, int /*level*/) {
+      for (size_t li = 0; li < scene.numberOfLayers(); li++) {
+        auto *layer = scene.layer(li);
+        if (!layer)
+          continue;
+
+        int nodeIdx = 0;
+        layer->traverse(layer->root(), [&](tsd::core::LayerNode &node, int level) {
+          // Show transform nodes and named nodes (skip pure object/leaf nodes)
+          if (!node->isTransform() && node->name().empty())
+            return true;
+
+          // Build a label: use name if set, else a fallback
+          char label[128];
+          const char *indent = "  ";
           if (!node->name().empty()) {
-            if (ImGui::MenuItem(node->name().c_str())) {
-              auto nodeRef = layer->at(node.index());
-              scene.addKeyframeAnimation(node->name().c_str(), nodeRef);
-              ImGui::CloseCurrentPopup();
-            }
+            std::snprintf(label, sizeof(label), "%*s%s", level * 2, "", node->name().c_str());
+          } else {
+            std::snprintf(label, sizeof(label), "%*s[xform %d]", level * 2, "", nodeIdx);
           }
+          nodeIdx++;
+
+          ImGui::PushID(static_cast<int>(li * 100000 + node.index()));
+          if (ImGui::MenuItem(label)) {
+            auto nodeRef = layer->at(node.index());
+            const char *animName = !node->name().empty() ? node->name().c_str() : label;
+            scene.addKeyframeAnimation(animName, nodeRef);
+            ImGui::CloseCurrentPopup();
+          }
+          ImGui::PopID();
           return true;
         });
       }
