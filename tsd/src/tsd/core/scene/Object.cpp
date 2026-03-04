@@ -111,7 +111,7 @@ Token Object::rendererDeviceName() const
 size_t Object::totalUseCount() const
 {
   return useCount(UseKind::APP) + useCount(UseKind::PARAMETER)
-      + useCount(UseKind::LAYER);
+      + useCount(UseKind::LAYER) + useCount(UseKind::INTERNAL);
 }
 
 size_t Object::useCount(UseKind kind) const
@@ -123,6 +123,8 @@ size_t Object::useCount(UseKind kind) const
     return m_useCounts.parameter;
   case UseKind::LAYER:
     return m_useCounts.layer;
+  case UseKind::INTERNAL:
+    return m_useCounts.internal;
   }
 
   logError("Object::UseCount() called with an unhandled UseKind");
@@ -140,6 +142,9 @@ void Object::incUseCount(UseKind kind)
     break;
   case UseKind::LAYER:
     m_useCounts.layer++;
+    break;
+  case UseKind::INTERNAL:
+    m_useCounts.internal++;
     break;
   }
 }
@@ -160,6 +165,10 @@ void Object::decUseCount(UseKind kind)
   case UseKind::LAYER:
     useCount = &m_useCounts.layer;
     typeStr = "LAYER";
+    break;
+  case UseKind::INTERNAL:
+    useCount = &m_useCounts.internal;
+    typeStr = "INTERNAL";
     break;
   }
 

@@ -236,8 +236,8 @@ struct Scene
 
   struct DefaultObjects
   {
-    ObjectUsePtr<Material> material;
-    ObjectUsePtr<Camera> camera;
+    ObjectUsePtr<Material, Object::UseKind::INTERNAL> material;
+    ObjectUsePtr<Camera, Object::UseKind::INTERNAL> camera;
   } m_defaultObjects;
 
   BaseUpdateDelegate *m_updateDelegate{nullptr};

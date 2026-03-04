@@ -55,7 +55,7 @@ struct Object : public ParameterObserver
 {
   using ParameterMap = FlatMap<Token, Parameter>;
   // clang-format off
-  enum class UseKind { APP, PARAMETER, LAYER };
+  enum class UseKind { APP, PARAMETER, LAYER, INTERNAL };
   // clang-format on
 
   Object(anari::DataType type = ANARI_UNKNOWN, Token subtype = tokens::none);
@@ -189,6 +189,7 @@ struct Object : public ParameterObserver
     size_t app{0};
     size_t parameter{0};
     size_t layer{0};
+    size_t internal{0};
   } m_useCounts;
   struct Versions
   {

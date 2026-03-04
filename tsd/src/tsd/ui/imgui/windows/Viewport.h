@@ -36,8 +36,6 @@ struct Viewport : public BaseViewport
   ~Viewport();
 
   void buildUI() override;
-  void resetView(bool resetAzEl = true);
-  void centerView();
   void setLibrary(const std::string &libName, bool doAsync = true);
   void setLibraryToDefault();
   void setDeviceChangeCb(ViewportDeviceChangeCb cb);

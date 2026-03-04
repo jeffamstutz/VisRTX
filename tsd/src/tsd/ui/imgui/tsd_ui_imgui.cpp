@@ -300,14 +300,15 @@ void buildUI_object(tsd::core::Object &o,
   if (o.type() == ANARI_RENDERER)
     ImGui::Text("    device: %s", o.rendererDeviceName().c_str());
 
-  ImGui::Text("use counts: %zu | %zu | %zu",
+  ImGui::Text("use counts: [ %zu | %zu | %zu | %zu ]",
       o.useCount(tsd::core::Object::UseKind::APP),
       o.useCount(tsd::core::Object::UseKind::PARAMETER),
-      o.useCount(tsd::core::Object::UseKind::LAYER));
+      o.useCount(tsd::core::Object::UseKind::LAYER),
+      o.useCount(tsd::core::Object::UseKind::INTERNAL));
   if (ImGui::IsItemHovered()) {
     ImGui::SetTooltip(
         "references to this object:"
-        " application | parameter | layer");
+        " application | parameter | layer | internal");
   }
 
   ImGui::Separator();
