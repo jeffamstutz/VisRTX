@@ -4,6 +4,8 @@
 #include "tsd/io/importers.hpp"
 #include "tsd/io/importers/detail/HDRImage.h"
 #include "tsd/io/importers/detail/importer_common.hpp"
+// tsd_core
+#include "tsd/core/Logging.hpp"
 
 namespace tsd::io {
 
@@ -28,9 +30,12 @@ void import_HDRI(Scene &scene, const char *filepath, LayerNodeRef location)
     arr->setData(rgb.data());
 
     auto [inst, hdri] = scene.insertNewChildObjectNode<Light>(
-        location ? location : scene.defaultLayer()->root(), tokens::light::hdri);
+        location ? location : scene.defaultLayer()->root(),
+        tokens::light::hdri);
     hdri->setName(fileOf(filepath).c_str());
     hdri->setParameterObject("radiance", *arr);
+  } else {
+    tsd::core::logError("[import_HDRI] Failed to load file '%s'", filepath);
   }
 }
 
