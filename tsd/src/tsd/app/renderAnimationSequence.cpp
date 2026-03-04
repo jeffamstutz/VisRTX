@@ -3,11 +3,13 @@
 
 #include "tsd/app/renderAnimationSequence.h"
 // tsd_app
+#include "tsd/app/ANARIDeviceManager.h"
 #include "tsd/app/Core.h"
 // tsd_core
 #include "tsd/core/Logging.hpp"
+#include "tsd/core/scene/Animation.hpp"
 // tsd_rendering
-#include "tsd/rendering/index/RenderIndex.hpp"
+#include "tsd/rendering/index/RenderIndexAllLayers.hpp"
 #include "tsd/rendering/pipeline/RenderPipeline.h"
 #include "tsd/rendering/pipeline/passes/VisualizeAOVPass.h"
 // std
@@ -18,151 +20,143 @@
 
 namespace tsd::app {
 
-// Helper types ///////////////////////////////////////////////////////////////
-
-struct OfflineRenderRig
-{
-  std::unique_ptr<tsd::rendering::RenderPipeline> pipeline;
-  tsd::rendering::AnariSceneRenderPass *anariPass{nullptr};
-  tsd::rendering::SaveToFilePass *saveToFilePass{nullptr};
-
-  tsd::rendering::RenderIndex *renderIndex{nullptr};
-
-  tsd::core::CameraRef camera;
-
-  int numFrames{0};
-};
-
-// Helper functions ///////////////////////////////////////////////////////////
-
-static OfflineRenderRig setupRig(tsd::app::Core &core)
-{
-  OfflineRenderRig rig;
-
-  // Setup render index //
-
-  auto &config = core.offline;
-  auto name = config.renderer.libraryName.c_str();
-  auto d = core.anari.loadDevice(name);
-
-  auto &scene = core.tsd.scene;
-  rig.renderIndex = core.anari.acquireRenderIndex(scene, name, d);
-
-  // Setup camera //
-
-  rig.camera = scene.getObject<tsd::core::Camera>(config.camera.cameraIndex);
-
-  if (!rig.camera) {
-    tsd::core::logError(
-        "[renderAnimationSequence] No camera objects configured");
-    anari::release(d, d);
-    return {};
-  }
-
-  auto c = anari::newObject<anari::Camera>(d, "perspective");
-
-  // Setup renderer //
-
-  if (config.renderer.rendererObjects.empty()
-      || config.renderer.activeRenderer < 0) {
-    tsd::core::logError(
-        "[renderAnimationSequence] No renderer objects configured");
-    anari::release(d, c);
-    anari::release(d, d);
-    return {};
-  }
-
-  auto &ro = config.renderer.rendererObjects[config.renderer.activeRenderer];
-  auto r = anari::newObject<anari::Renderer>(d, ro.subtype().c_str());
-  ro.updateAllANARIParameters(d, r);
-  anari::commitParameters(d, r);
-
-  // Create pipeline stages //
-
-  rig.pipeline = std::make_unique<tsd::rendering::RenderPipeline>();
-
-  rig.anariPass =
-      rig.pipeline->emplace_back<tsd::rendering::AnariSceneRenderPass>(d);
-  rig.saveToFilePass =
-      rig.pipeline->emplace_back<tsd::rendering::SaveToFilePass>();
-
-  // Configure pipeline stages //
-
-  rig.pipeline->setDimensions(config.frame.width, config.frame.height);
-
-  rig.anariPass->setRunAsync(false);
-  rig.anariPass->setEnableIDs(false);
-  rig.anariPass->setColorFormat(ANARI_UFIXED8_RGBA_SRGB);
-  rig.anariPass->setWorld(rig.renderIndex->world());
-  rig.anariPass->setRenderer(r);
-  rig.anariPass->setCamera(c);
-
-  // Add AOV visualization pass if enabled
-  if (config.aov.aovType != tsd::rendering::AOVType::NONE) {
-    auto *aovPass =
-        rig.pipeline->emplace_back<tsd::rendering::VisualizeAOVPass>();
-    aovPass->setAOVType(config.aov.aovType);
-    aovPass->setDepthRange(config.aov.depthMin, config.aov.depthMax);
-    aovPass->setEdgeThreshold(config.aov.edgeThreshold);
-    aovPass->setEdgeInvert(config.aov.edgeInvert);
-
-    // Enable necessary frame channels
-    if (config.aov.aovType == tsd::rendering::AOVType::ALBEDO) {
-      rig.anariPass->setEnableAlbedo(true);
-    } else if (config.aov.aovType == tsd::rendering::AOVType::NORMAL) {
-      rig.anariPass->setEnableNormals(true);
-    } else if (config.aov.aovType == tsd::rendering::AOVType::EDGES
-        || config.aov.aovType == tsd::rendering::AOVType::OBJECT_ID) {
-      rig.anariPass->setEnableIDs(true);
-    } else if (config.aov.aovType == tsd::rendering::AOVType::PRIMITIVE_ID) {
-      rig.anariPass->setEnablePrimitiveId(true);
-    } else if (config.aov.aovType == tsd::rendering::AOVType::INSTANCE_ID) {
-      rig.anariPass->setEnableInstanceId(true);
-    }
-  }
-
-  rig.saveToFilePass->setEnabled(true);
-  rig.saveToFilePass->setSingleShotMode(false);
-
-  // Cleanup //
-
-  anari::release(d, r);
-  anari::release(d, c);
-  anari::release(d, d);
-
-  return std::move(rig);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-
 void renderAnimationSequence(Core &core,
     const std::string &outputDir,
     const std::string &filePrefix,
     RenderSequenceCallback preFrameCallback)
 {
-  core.updateCameraPathAnimation();
-  auto rp = setupRig(core);
+  auto &config = core.offline;
+  auto &scene = core.tsd.scene;
 
-  if (rp.pipeline.get() == nullptr) {
+  // Validate renderer config //
+
+  if (config.renderer.rendererObjects.empty()
+      || config.renderer.activeRenderer < 0) {
     tsd::core::logError(
-        "[renderAnimationSequence]"
-        " Aborting render sequence due to setup error");
+        "[renderAnimationSequence] No renderer objects configured");
     return;
   }
 
-  auto &scene = core.tsd.scene;
-  float originalTime = scene.getAnimationTime();
+  auto &ro = config.renderer.rendererObjects[config.renderer.activeRenderer];
+  auto libName = config.renderer.libraryName;
 
-  auto d = rp.anariPass->getDevice();
-  auto c = rp.anariPass->getCamera();
+  tsd::core::logStatus(
+      "[renderAnimationSequence] Loading ANARI device '%s'...",
+      libName.c_str());
 
-  auto &config = core.offline.frame;
+  // Create a fresh isolated device (not shared with viewport) //
 
-  // If the scene has keyframe animations, use the timeline's frame count
-  // so "Render Animation Sequence" just works without manually syncing
-  // the offline numFrames setting.
+  auto library =
+      anari::loadLibrary(libName.c_str(), anariStatusFunc, nullptr);
+  if (!library) {
+    tsd::core::logError(
+        "[renderAnimationSequence] Failed to load ANARI library '%s'",
+        libName.c_str());
+    return;
+  }
+  auto d = anari::newDevice(library, "default");
+  anari::unloadLibrary(library);
+  if (!d) {
+    tsd::core::logError(
+        "[renderAnimationSequence] Failed to create ANARI device '%s'",
+        libName.c_str());
+    return;
+  }
+  anari::commitParameters(d, d);
+
+  auto renderIndex =
+      std::make_unique<tsd::rendering::RenderIndexAllLayers>(scene, libName, d);
+  renderIndex->populate();
+
+  // Validate camera — resolve index //
+
+  size_t camIdx = config.camera.cameraIndex;
+
+  // If no camera configured, find one from keyframe animations
+  if (camIdx == tsd::core::INVALID_INDEX) {
+    for (size_t i = 0; i < scene.numberOfAnimations(); i++) {
+      auto *anim = scene.animation(i);
+      if (anim->hasKeyframes() && anim->keyframeTargetObject()) {
+        camIdx = anim->keyframeTargetObject()->index();
+        break;
+      }
+    }
+  }
+
+  // Last resort: use camera 0
+  if (camIdx == tsd::core::INVALID_INDEX)
+    camIdx = 0;
+
+  auto cameraRef = scene.getObject<tsd::core::Camera>(camIdx);
+  if (!cameraRef) {
+    tsd::core::logError(
+        "[renderAnimationSequence] No camera at index %zu", camIdx);
+    anari::release(d, d);
+    return;
+  }
+
+  // Setup renderer //
+
+  auto r = anari::newObject<anari::Renderer>(d, ro.subtype().c_str());
+  ro.updateAllANARIParameters(d, r);
+  anari::commitParameters(d, r);
+
+  // Setup render pipeline //
+
+  tsd::rendering::RenderPipeline pipeline;
+  pipeline.setDimensions(config.frame.width, config.frame.height);
+
+  auto *anariPass =
+      pipeline.emplace_back<tsd::rendering::AnariSceneRenderPass>(d);
+  anariPass->setRunAsync(false);
+  anariPass->setEnableIDs(false);
+  anariPass->setColorFormat(ANARI_UFIXED8_RGBA_SRGB);
+  anariPass->setWorld(renderIndex->world());
+  anariPass->setRenderer(r);
+  anariPass->setCamera(renderIndex->camera(cameraRef->index()));
+
+  // AOV pass //
+
+  if (config.aov.aovType != tsd::rendering::AOVType::NONE) {
+    auto *aovPass =
+        pipeline.emplace_back<tsd::rendering::VisualizeAOVPass>();
+    aovPass->setAOVType(config.aov.aovType);
+    aovPass->setDepthRange(config.aov.depthMin, config.aov.depthMax);
+    aovPass->setEdgeThreshold(config.aov.edgeThreshold);
+    aovPass->setEdgeInvert(config.aov.edgeInvert);
+
+    if (config.aov.aovType == tsd::rendering::AOVType::ALBEDO)
+      anariPass->setEnableAlbedo(true);
+    else if (config.aov.aovType == tsd::rendering::AOVType::NORMAL)
+      anariPass->setEnableNormals(true);
+    else if (config.aov.aovType == tsd::rendering::AOVType::EDGES
+        || config.aov.aovType == tsd::rendering::AOVType::OBJECT_ID)
+      anariPass->setEnableIDs(true);
+    else if (config.aov.aovType == tsd::rendering::AOVType::PRIMITIVE_ID)
+      anariPass->setEnablePrimitiveId(true);
+    else if (config.aov.aovType == tsd::rendering::AOVType::INSTANCE_ID)
+      anariPass->setEnableInstanceId(true);
+  }
+
+  auto *savePass = pipeline.emplace_back<tsd::rendering::SaveToFilePass>();
+  savePass->setSingleShotMode(false);
+
+  // Set aspect ratio on the render index's camera //
+
+  {
+    auto c = renderIndex->camera(cameraRef->index());
+    anari::setParameter(d,
+        c,
+        "aspect",
+        static_cast<float>(config.frame.width) / config.frame.height);
+    anari::commitParameters(d, c);
+  }
+
+  anari::release(d, r);
+  anari::release(d, d);
+
+  // Determine frame range //
+
   bool hasKeyframeAnimation = false;
   for (size_t i = 0; i < scene.numberOfAnimations(); i++) {
     if (scene.animation(i)->hasKeyframes()) {
@@ -170,60 +164,52 @@ void renderAnimationSequence(Core &core,
       break;
     }
   }
-  int numFrames =
-      hasKeyframeAnimation ? scene.getAnimationTotalFrames() : config.numFrames;
+  int numFrames = hasKeyframeAnimation ? scene.getAnimationTotalFrames()
+                                       : config.frame.numFrames;
 
-  auto start = config.renderSubset ? config.startFrame : 0;
-  auto end = config.renderSubset ? config.endFrame : numFrames - 1;
-  auto increment = config.frameIncrement;
+  auto frameStart = config.frame.renderSubset ? config.frame.startFrame : 0;
+  auto frameEnd =
+      config.frame.renderSubset ? config.frame.endFrame : numFrames - 1;
+  auto increment = config.frame.frameIncrement;
 
-  for (int frameIndex = start; frameIndex <= end; frameIndex += increment) {
+  int savedFrame = scene.getAnimationFrame();
+
+  tsd::core::logStatus(
+      "[renderAnimationSequence] Rendering %d frames (%d spp) to '%s'...",
+      numFrames,
+      config.frame.samples,
+      outputDir.c_str());
+
+  for (int frameIndex = frameStart; frameIndex <= frameEnd;
+       frameIndex += increment) {
     if (preFrameCallback) {
       if (!preFrameCallback(frameIndex, numFrames)) {
         tsd::core::logStatus(
-            "[renderAnimationSequence] Aborting render sequence at frame %d",
-            frameIndex);
+            "[renderAnimationSequence] Aborted at frame %d", frameIndex);
         break;
       }
     }
 
-    // Set scene time for this frame //
+    // Advance animation — updates TSD objects, render index commits to ANARI //
+    scene.setAnimationFrame(frameIndex);
 
-    float time = static_cast<float>(frameIndex) / (numFrames - 1);
-    scene.setAnimationTime(time);
-
-    // Update camera (in case it is animated) //
-
-    rp.camera->updateAllANARIParameters(d, c);
-    anari::setParameter(d,
-        c,
-        "aspect",
-        static_cast<float>(core.offline.frame.width)
-            / core.offline.frame.height);
-    anari::commitParameters(d, c);
-
-    // Setup output file pass //
-
+    // Output filename //
     std::ostringstream ss;
     ss << filePrefix << std::setfill('0') << std::setw(4) << frameIndex
        << ".png";
     std::filesystem::path filename =
         std::filesystem::path(outputDir) / ss.str();
+    savePass->setFilename(filename.string());
 
-    rp.saveToFilePass->setFilename(filename.string());
-
-    // Render the frame //
-
-    for (int i = 0; i < core.offline.frame.samples; ++i) {
-      rp.saveToFilePass->setEnabled(i == core.offline.frame.samples - 1);
-      rp.pipeline->render();
+    // Accumulate samples, save on last //
+    for (int s = 0; s < config.frame.samples; ++s) {
+      savePass->setEnabled(s == config.frame.samples - 1);
+      pipeline.render();
     }
   }
 
-  // Cleanup //
-
-  scene.setAnimationTime(originalTime);
-  core.anari.releaseRenderIndex(rp.anariPass->getDevice());
+  // Restore animation state //
+  scene.setAnimationFrame(savedFrame);
 }
 
 } // namespace tsd::app
