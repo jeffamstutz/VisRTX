@@ -10,8 +10,10 @@
 #ifndef _WIN32
 #include "tinyexr.h"
 #endif
-// tsd
+// tsd_core
 #include "tsd/core/Logging.hpp"
+// tsd_io
+#include "tsd/io/importers/detail/importer_common.hpp"
 
 #include "HDRImage.h"
 
@@ -21,15 +23,7 @@ using namespace tsd::core;
 
 bool HDRImage::import(std::string fileName)
 {
-  if (fileName.size() < 4)
-    return false;
-
-  // check the extension
-  std::string extension = std::string(strrchr(fileName.c_str(), '.'));
-  std::transform(extension.data(),
-      extension.data() + extension.size(),
-      std::addressof(extension[0]),
-      [](unsigned char c) { return std::tolower(c); });
+  auto extension = extensionOf(fileName);
 
   if (extension != ".hdr" && extension != ".exr")
     return false;
@@ -43,14 +37,14 @@ bool HDRImage::import(std::string fileName)
     height = h;
     numComponents = 3; // because of STBI_rgb
     if (width <= 0 || height <= 0 || n < 3) {
-      stbi_image_free(const_cast<float*>(imgData));
-      logError("import_HDRI] error importing HDR image: %s", fileName.c_str());
+      stbi_image_free(const_cast<float *>(imgData));
+      logError("[import_HDRI] error importing HDR image: %s", fileName.c_str());
       return false;
     }
 
     pixel.resize(w * h * 3);
     std::memcpy(pixel.data(), imgData, w * h * 3 * sizeof(float));
-    stbi_image_free(const_cast<float*>(imgData));
+    stbi_image_free(const_cast<float *>(imgData));
     return true;
 #ifdef _WIN32
   }
@@ -61,7 +55,7 @@ bool HDRImage::import(std::string fileName)
     const char *err;
     int ret = LoadEXR(&imgData, &w, &h, fileName.c_str(), &err);
     if (ret != 0) {
-      logError("import_HDRI] error importing EXR: %s", err);
+      logError("[import_HDRI] error importing EXR: %s", err);
       return false;
     }
 
@@ -90,4 +84,4 @@ bool HDRImage::import(std::string fileName)
   return false;
 }
 
-} // namespace tsd
+} // namespace tsd::io
