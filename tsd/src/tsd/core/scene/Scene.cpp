@@ -792,6 +792,13 @@ Animation *Scene::addKeyframeAnimation(const char *name, LayerNodeRef node)
   return anim;
 }
 
+Animation *Scene::addKeyframeAnimationForCamera(const char *name, CameraRef cam)
+{
+  auto *anim = addAnimation(name);
+  anim->setKeyframeTargetObject(*cam);
+  return anim;
+}
+
 void Scene::removeUnusedObjects(bool includeRenderersAndCameras)
 {
   tsd::core::logStatus("Removing unused context objects");

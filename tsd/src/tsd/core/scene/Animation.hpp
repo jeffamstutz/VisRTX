@@ -84,6 +84,7 @@ struct Animation
   const std::vector<TransformKeyframe> &transformKeyframes() const;
   const std::vector<KeyframeChannel> &keyframeChannels() const;
   LayerNodeRef keyframeTargetNode() const;
+  const Object *keyframeTargetObject() const;
 
   void update(float time);
 

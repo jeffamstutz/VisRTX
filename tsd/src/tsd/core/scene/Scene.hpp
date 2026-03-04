@@ -222,6 +222,7 @@ struct Scene
   void incrementAnimationFrame(); // frame++ with loop wrap
 
   Animation *addKeyframeAnimation(const char *name, LayerNodeRef node);
+  Animation *addKeyframeAnimationForCamera(const char *name, CameraRef cam);
 
   ////////////////////////
   // Cleanup operations //

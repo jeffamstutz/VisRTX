@@ -215,6 +215,11 @@ LayerNodeRef Animation::keyframeTargetNode() const
   return m_keyframes.transformNode;
 }
 
+const Object *Animation::keyframeTargetObject() const
+{
+  return m_keyframes.object.get();
+}
+
 Any Animation::interpolateAny(
     const Any &a, const Any &b, float alpha, ANARIDataType type)
 {

@@ -3,7 +3,9 @@
 
 #include "Timeline.h"
 // tsd_core
+#include "tsd/core/ObjectPool.hpp"
 #include "tsd/core/scene/Animation.hpp"
+#include "tsd/core/scene/objects/Camera.hpp"
 // tsd_ui_imgui
 #include "tsd/ui/imgui/Application.h"
 // std
@@ -12,6 +14,26 @@
 #include <cstring>
 
 namespace tsd::ui::imgui {
+
+static void captureCurrentCameraKeyframe(
+    tsd::core::Animation *anim, float t)
+{
+  const auto *obj = anim->keyframeTargetObject();
+  if (!obj || obj->type() != ANARI_CAMERA)
+    return;
+  const auto *cam = static_cast<const tsd::core::Camera *>(obj);
+
+  if (auto v = cam->parameterValueAs<math::float3>("position"))
+    anim->addValueKeyframe("position", ANARI_FLOAT32_VEC3, t, &*v);
+  if (auto v = cam->parameterValueAs<math::float3>("direction"))
+    anim->addValueKeyframe("direction", ANARI_FLOAT32_VEC3, t, &*v);
+  if (auto v = cam->parameterValueAs<math::float3>("up"))
+    anim->addValueKeyframe("up", ANARI_FLOAT32_VEC3, t, &*v);
+  if (cam->subtype() == tsd::core::tokens::camera::perspective) {
+    if (auto v = cam->parameterValueAs<float>("fovy"))
+      anim->addValueKeyframe("fovy", ANARI_FLOAT32, t, &*v);
+  }
+}
 
 Timeline::Timeline(Application *app, const char *name) : Window(app, name) {}
 
@@ -46,6 +68,8 @@ void Timeline::buildUI()
       if (nodeRef) {
         math::mat4 mat = (*nodeRef)->getTransform();
         anim->addTransformKeyframe(t, mat);
+      } else {
+        captureCurrentCameraKeyframe(anim, t);
       }
     }
   }
@@ -209,7 +233,6 @@ void Timeline::buildUI_canvas()
 
           // Build a label: use name if set, else a fallback
           char label[128];
-          const char *indent = "  ";
           if (!node->name().empty()) {
             std::snprintf(label, sizeof(label), "%*s%s", level * 2, "", node->name().c_str());
           } else {
@@ -228,6 +251,27 @@ void Timeline::buildUI_canvas()
           return true;
         });
       }
+
+      ImGui::Separator();
+      ImGui::Text("Cameras:");
+
+      const auto &cameraDB = scene.objectDB().camera;
+      tsd::core::foreach_item_const(cameraDB, [&](const auto *cam) {
+        if (!cam)
+          return;
+        char label[128];
+        const auto &camName = cam->name();
+        if (!camName.empty())
+          std::snprintf(label, sizeof(label), "%s", camName.c_str());
+        else
+          std::snprintf(label, sizeof(label), "Camera [%zu]", cam->index());
+        ImGui::PushID(static_cast<int>(cam->index() + 900000));
+        if (ImGui::MenuItem(label)) {
+          scene.addKeyframeAnimationForCamera(label, cam->self());
+          ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopID();
+      });
 
       ImGui::EndPopup();
     }
@@ -438,6 +482,8 @@ void Timeline::buildUI_canvas()
         if (nodeRef) {
           math::mat4 mat = (*nodeRef)->getTransform();
           anim->addTransformKeyframe(t, mat);
+        } else {
+          captureCurrentCameraKeyframe(anim, t);
         }
       }
     }
