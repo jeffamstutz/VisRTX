@@ -159,13 +159,27 @@ void renderAnimationSequence(Core &core,
   auto c = rp.anariPass->getCamera();
 
   auto &config = core.offline.frame;
+
+  // If the scene has keyframe animations, use the timeline's frame count
+  // so "Render Animation Sequence" just works without manually syncing
+  // the offline numFrames setting.
+  bool hasKeyframeAnimation = false;
+  for (size_t i = 0; i < scene.numberOfAnimations(); i++) {
+    if (scene.animation(i)->hasKeyframes()) {
+      hasKeyframeAnimation = true;
+      break;
+    }
+  }
+  int numFrames =
+      hasKeyframeAnimation ? scene.getAnimationTotalFrames() : config.numFrames;
+
   auto start = config.renderSubset ? config.startFrame : 0;
-  auto end = config.renderSubset ? config.endFrame : config.numFrames - 1;
+  auto end = config.renderSubset ? config.endFrame : numFrames - 1;
   auto increment = config.frameIncrement;
 
   for (int frameIndex = start; frameIndex <= end; frameIndex += increment) {
     if (preFrameCallback) {
-      if (!preFrameCallback(frameIndex, config.numFrames)) {
+      if (!preFrameCallback(frameIndex, numFrames)) {
         tsd::core::logStatus(
             "[renderAnimationSequence] Aborting render sequence at frame %d",
             frameIndex);
@@ -175,7 +189,7 @@ void renderAnimationSequence(Core &core,
 
     // Set scene time for this frame //
 
-    float time = static_cast<float>(frameIndex) / (config.numFrames - 1);
+    float time = static_cast<float>(frameIndex) / (numFrames - 1);
     scene.setAnimationTime(time);
 
     // Update camera (in case it is animated) //

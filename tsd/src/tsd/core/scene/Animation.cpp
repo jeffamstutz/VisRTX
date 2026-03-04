@@ -423,6 +423,56 @@ void Animation::serialize(DataNode &node) const
       setNode["steps"].setValue(ts.stepsValues[i]->index());
     }
   }
+
+  // Serialize keyframe animation //
+
+  auto &kf = m_keyframes;
+  if (!hasKeyframes())
+    return;
+
+  auto &kfNode = node["keyframes"];
+
+  // Transform node reference
+  if (kf.transformNode) {
+    auto *lay = kf.transformNode->container();
+    kfNode["nodeLayer"] = m_scene->getLayerName(lay).str();
+    kfNode["nodeIndex"] = kf.transformNode->index();
+  }
+
+  // Camera/object reference
+  if (kf.object) {
+    kfNode["object"] =
+        tsd::core::Any(kf.object->type(), kf.object->index());
+  }
+
+  // Transform keyframes: time + flat mat4 (16 floats)
+  auto &tkfsNode = kfNode["transformKeyframes"];
+  for (const auto &tk : kf.transformKeyframes) {
+    auto &tkNode = tkfsNode.append();
+    tkNode["time"] = tk.time;
+    float m[16];
+    for (int c = 0; c < 4; c++)
+      for (int r = 0; r < 4; r++)
+        m[c * 4 + r] = tk.matrix[c][r];
+    tkNode["matrix"].setValueAsArray<float>(m, 16);
+  }
+
+  // Value keyframe channels — store values as raw float arrays for safe
+  // round-tripping through the DataTree file format
+  auto &chansNode = kfNode["channels"];
+  for (const auto &chan : kf.channels) {
+    auto &chanNode = chansNode.append();
+    chanNode["parameterName"] = chan.parameterName.str();
+    chanNode["type"] = (int)chan.type;
+    size_t numFloats = anari::sizeOf(chan.type) / sizeof(float);
+    auto &vkfsNode = chanNode["keyframes"];
+    for (const auto &vk : chan.keyframes) {
+      auto &vkNode = vkfsNode.append();
+      vkNode["time"] = vk.time;
+      vkNode["value"].setValueAsArray<float>(
+          static_cast<const float *>(vk.value.data()), numFloats);
+    }
+  }
 }
 
 void Animation::deserialize(DataNode &node)
@@ -486,10 +536,78 @@ void Animation::deserialize(DataNode &node)
         }
       });
 
-      if (isArrayBased)
-        setAsTimeSteps(*object, parameterNames, allSteps);
-      else
-        setAsTimeSteps(*object, parameterNames, allValueSteps);
+      if (object) {
+        if (isArrayBased)
+          setAsTimeSteps(*object, parameterNames, allSteps);
+        else
+          setAsTimeSteps(*object, parameterNames, allValueSteps);
+      }
+    }
+  }
+
+  // Deserialize keyframe animation //
+
+  if (auto *kfData = node.child("keyframes"); kfData != nullptr) {
+    auto &kf = m_keyframes;
+
+    // Restore transform node reference
+    if (auto *nlNode = kfData->child("nodeLayer")) {
+      auto layerName = Token(nlNode->getValueAs<std::string>().c_str());
+      auto *lay = m_scene->layer(layerName);
+      if (lay) {
+        size_t idx = (*kfData)["nodeIndex"].getValueAs<size_t>();
+        kf.transformNode = lay->at(idx);
+      }
+    }
+
+    // Restore camera/object reference
+    if (auto *objNode = kfData->child("object")) {
+      auto *obj = m_scene->getObject(objNode->getValue());
+      if (obj)
+        kf.object = *obj;  // use operator=(Object&), NOT the constructor (which is a no-op)
+    }
+
+    // Restore transform keyframes
+    if (auto *tkfsNode = kfData->child("transformKeyframes")) {
+      tkfsNode->foreach_child([&](DataNode &tkNode) {
+        TransformKeyframe tk;
+        tk.time = tkNode["time"].getValueAs<float>();
+        ANARIDataType type = ANARI_UNKNOWN;
+        void *data = nullptr;
+        size_t numVals = 0;
+        tkNode["matrix"].getValueAsArray(&type, &data, &numVals);
+        if (type == ANARI_FLOAT32 && numVals == 16) {
+          auto *m = static_cast<float *>(data);
+          for (int c = 0; c < 4; c++)
+            for (int r = 0; r < 4; r++)
+              tk.matrix[c][r] = m[c * 4 + r];
+        }
+        kf.transformKeyframes.push_back(std::move(tk));
+      });
+    }
+
+    // Restore value keyframe channels
+    if (auto *chansNode = kfData->child("channels")) {
+      chansNode->foreach_child([&](DataNode &chanNode) {
+        KeyframeChannel chan;
+        chan.parameterName =
+            Token(chanNode["parameterName"].getValueAs<std::string>().c_str());
+        chan.type = (ANARIDataType)chanNode["type"].getValueAs<int>();
+        if (auto *vkfsNode = chanNode.child("keyframes")) {
+          vkfsNode->foreach_child([&](DataNode &vkNode) {
+            ValueKeyframe vk;
+            vk.time = vkNode["time"].getValueAs<float>();
+            ANARIDataType valType = ANARI_UNKNOWN;
+            void *valData = nullptr;
+            size_t valCount = 0;
+            vkNode["value"].getValueAsArray(&valType, &valData, &valCount);
+            if (valData && valCount > 0)
+              vk.value = Any(chan.type, valData);
+            chan.keyframes.push_back(std::move(vk));
+          });
+        }
+        kf.channels.push_back(std::move(chan));
+      });
     }
   }
 }
