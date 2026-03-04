@@ -177,8 +177,9 @@ void Object::decUseCount(UseKind kind)
   else {
     logError(
         "Object::decUseCount() called on object with zero use count on object"
-        " of type %s and name '%s', with use kind of {%s}",
+        " of type %s, idx %zu, and name '%s', with use kind of {%s}",
         anari::toString(type()),
+        index(),
         name().c_str(),
         typeStr);
   }

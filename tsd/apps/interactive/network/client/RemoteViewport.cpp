@@ -232,18 +232,18 @@ void RemoteViewport::updateCamera()
 
   const bool cameraFromServer =
       !m_camera.current && m_receivedCameraIdx != TSD_INVALID_INDEX;
-  const bool cameraChanged = m_camera.current != m_prevCamera;
+  const bool cameraChanged =
+      m_camera.current && m_camera.current != m_prevCamera;
 
   if (cameraFromServer) {
     auto *core = appCore();
     auto &scene = core->tsd.scene;
-    m_camera.current = scene.getObject<tsd::core::Camera>(m_receivedCameraIdx);
+    camera_setCurrent(scene.getObject<tsd::core::Camera>(m_receivedCameraIdx));
     m_camera.arcballToken = {};
     m_manipulatorSynchronized = false;
     return;
   } else if (cameraChanged) {
-    auto currentIdx =
-        m_camera.current ? m_camera.current->index() : TSD_INVALID_INDEX;
+    auto currentIdx = m_camera.current->index();
     m_receivedCameraIdx = currentIdx;
     m_channel->send(MessageType::SERVER_SET_CURRENT_CAMERA, &currentIdx);
     m_prevCamera = m_camera.current;
