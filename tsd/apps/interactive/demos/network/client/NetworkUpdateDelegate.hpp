@@ -44,6 +44,8 @@ struct NetworkUpdateDelegate : public tsd::core::BaseUpdateDelegate
   void signalAnimationTimeChanged(float) override;
 
  private:
+  bool isReady(const char *fcn) const;
+
   tsd::core::Scene *m_scene{nullptr};
   tsd::network::NetworkChannel *m_channel{nullptr};
   bool m_enabled{true};

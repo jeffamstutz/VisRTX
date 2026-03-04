@@ -14,6 +14,10 @@
 
 #include "../RenderSession.hpp"
 
+#define CHECK_READY_OR_RETURN() \
+  if (!isReady(__func__)) \
+    return;
+
 namespace tsd::network {
 
 NetworkUpdateDelegate::NetworkUpdateDelegate(
@@ -36,13 +40,7 @@ void NetworkUpdateDelegate::setNetworkChannel(
 
 void NetworkUpdateDelegate::signalObjectAdded(const tsd::core::Object *o)
 {
-  if (!m_enabled)
-    return;
-  else if (!m_channel) {
-    tsd::core::logError(
-        "NetworkUpdateDelegate::signalObjectAdded: no network channel");
-    return;
-  }
+  CHECK_READY_OR_RETURN();
   auto msg = tsd::network::messages::NewObject(o);
   m_channel->send(MessageType::SERVER_ADD_OBJECT, std::move(msg));
 }
@@ -50,13 +48,7 @@ void NetworkUpdateDelegate::signalObjectAdded(const tsd::core::Object *o)
 void NetworkUpdateDelegate::signalParameterUpdated(
     const tsd::core::Object *o, const tsd::core::Parameter *p)
 {
-  if (!m_enabled)
-    return;
-  else if (!m_channel) {
-    tsd::core::logError(
-        "NetworkUpdateDelegate::signalParameterUpdated: no network channel");
-    return;
-  }
+  CHECK_READY_OR_RETURN();
   auto msg = tsd::network::messages::ParameterChange(o, p);
   m_channel->send(MessageType::SERVER_SET_OBJECT_PARAMETER, std::move(msg));
 }
@@ -64,13 +56,7 @@ void NetworkUpdateDelegate::signalParameterUpdated(
 void NetworkUpdateDelegate::signalParameterRemoved(
     const tsd::core::Object *o, const tsd::core::Parameter *p)
 {
-  if (!m_enabled)
-    return;
-  else if (!m_channel) {
-    tsd::core::logError(
-        "NetworkUpdateDelegate::signalParameterRemoved: no network channel");
-    return;
-  }
+  CHECK_READY_OR_RETURN();
   auto msg = tsd::network::messages::ParameterRemove(o, p);
   m_channel->send(MessageType::SERVER_REMOVE_OBJECT_PARAMETER, std::move(msg));
 }
@@ -78,33 +64,20 @@ void NetworkUpdateDelegate::signalParameterRemoved(
 void NetworkUpdateDelegate::signalParameterBatchUpdated(
     const tsd::core::Object *o, const std::vector<tsd::core::Parameter *> &ps)
 {
-  if (!m_enabled)
-    return;
-  else if (!m_channel) {
-    tsd::core::logError(
-        "NetworkUpdateDelegate::signalParameterBatchUpdated: no channel");
-    return;
-  }
+  CHECK_READY_OR_RETURN();
   auto msg = tsd::network::messages::ParameterChange(o, ps.data(), ps.size());
   m_channel->send(MessageType::SERVER_SET_OBJECT_PARAMETER, std::move(msg));
 }
 
 void NetworkUpdateDelegate::signalArrayMapped(const tsd::core::Array *)
 {
-  if (!m_enabled)
-    return;
+  CHECK_READY_OR_RETURN();
   // no-op
 }
 
 void NetworkUpdateDelegate::signalArrayUnmapped(const tsd::core::Array *a)
 {
-  if (!m_enabled)
-    return;
-  else if (!m_channel) {
-    tsd::core::logError(
-        "NetworkUpdateDelegate::signalArrayUnmapped: no network channel");
-    return;
-  }
+  CHECK_READY_OR_RETURN();
   auto msg = tsd::network::messages::TransferArrayData(a);
   m_channel->send(MessageType::SERVER_SET_ARRAY_DATA, std::move(msg));
 }
@@ -112,53 +85,33 @@ void NetworkUpdateDelegate::signalArrayUnmapped(const tsd::core::Array *a)
 void NetworkUpdateDelegate::signalObjectParameterUseCountZero(
     const tsd::core::Object *obj)
 {
-  if (!m_enabled)
-    return;
+  CHECK_READY_OR_RETURN();
   // no-op
 }
 
 void NetworkUpdateDelegate::signalObjectLayerUseCountZero(
     const tsd::core::Object *obj)
 {
-  if (!m_enabled)
-    return;
+  CHECK_READY_OR_RETURN();
   // no-op
 }
 
 void NetworkUpdateDelegate::signalObjectRemoved(const tsd::core::Object *o)
 {
-  if (!m_enabled)
-    return;
-  else if (!m_channel) {
-    tsd::core::logError(
-        "NetworkUpdateDelegate::signalObjectRemoved: no network channel");
-    return;
-  }
+  CHECK_READY_OR_RETURN();
   auto msg = tsd::network::messages::RemoveObject(o);
   m_channel->send(MessageType::SERVER_REMOVE_OBJECT, std::move(msg));
 }
 
 void NetworkUpdateDelegate::signalRemoveAllObjects()
 {
-  if (!m_enabled)
-    return;
-  else if (!m_channel) {
-    tsd::core::logError(
-        "NetworkUpdateDelegate::signalRemoveAllObjects: no network channel");
-    return;
-  }
+  CHECK_READY_OR_RETURN();
   m_channel->send(MessageType::SERVER_REMOVE_ALL_OBJECTS);
 }
 
 void NetworkUpdateDelegate::signalLayerAdded(const tsd::core::Layer *l)
 {
-  if (!m_enabled)
-    return;
-  else if (!m_channel) {
-    tsd::core::logError(
-        "NetworkUpdateDelegate::signalLayerAdded: no network channel");
-    return;
-  }
+  CHECK_READY_OR_RETURN();
   auto msg = tsd::network::messages::TransferLayer(
       m_scene, const_cast<tsd::core::Layer *>(l));
   m_channel->send(MessageType::SERVER_UPDATE_LAYER, std::move(msg));
@@ -166,13 +119,7 @@ void NetworkUpdateDelegate::signalLayerAdded(const tsd::core::Layer *l)
 
 void NetworkUpdateDelegate::signalLayerUpdated(const tsd::core::Layer *l)
 {
-  if (!m_enabled)
-    return;
-  else if (!m_channel) {
-    tsd::core::logError(
-        "NetworkUpdateDelegate::signalLayerUpdated: no network channel");
-    return;
-  }
+  CHECK_READY_OR_RETURN();
   auto msg = tsd::network::messages::TransferLayer(
       m_scene, const_cast<tsd::core::Layer *>(l));
   m_channel->send(MessageType::SERVER_UPDATE_LAYER, std::move(msg));
@@ -180,42 +127,48 @@ void NetworkUpdateDelegate::signalLayerUpdated(const tsd::core::Layer *l)
 
 void NetworkUpdateDelegate::signalLayerRemoved(const tsd::core::Layer *)
 {
-  if (!m_enabled)
-    return;
+  CHECK_READY_OR_RETURN();
   tsd::core::logWarning(
       "NetworkUpdateDelegate::signalLayerRemoved not implemented");
 }
 
 void NetworkUpdateDelegate::signalActiveLayersChanged()
 {
-  if (!m_enabled)
-    return;
+  CHECK_READY_OR_RETURN();
   tsd::core::logWarning(
       "NetworkUpdateDelegate::signalActiveLayersChanged not implemented");
 }
 
 void NetworkUpdateDelegate::signalObjectFilteringChanged()
 {
-  if (!m_enabled)
-    return;
+  CHECK_READY_OR_RETURN();
   tsd::core::logWarning(
       "NetworkUpdateDelegate::signalObjectFilteringChanged not implemented");
 }
 
 void NetworkUpdateDelegate::signalInvalidateCachedObjects()
 {
-  if (!m_enabled)
-    return;
+  CHECK_READY_OR_RETURN();
   tsd::core::logWarning(
       "NetworkUpdateDelegate::signalInvalidateCachedObjects not implemented");
 }
 
 void NetworkUpdateDelegate::signalAnimationTimeChanged(float)
 {
-  if (!m_enabled)
-    return;
+  CHECK_READY_OR_RETURN();
   tsd::core::logWarning(
       "NetworkUpdateDelegate::signalAnimationTimeChanged not implemented");
+}
+
+bool NetworkUpdateDelegate::isReady(const char *fcn) const
+{
+  if (!m_enabled) {
+    return false;
+  } else if (!m_channel) {
+    tsd::core::logError("%s: no network channel", fcn);
+    return false;
+  }
+  return true;
 }
 
 } // namespace tsd::network
