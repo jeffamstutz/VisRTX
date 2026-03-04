@@ -743,6 +743,55 @@ void Scene::incrementAnimationTime()
   setAnimationTime(newTime);
 }
 
+int Scene::getAnimationTotalFrames() const
+{
+  return m_animations.totalFrames;
+}
+
+void Scene::setAnimationTotalFrames(int frames)
+{
+  m_animations.totalFrames = std::max(2, frames);
+}
+
+float Scene::getAnimationFPS() const
+{
+  return m_animations.fps;
+}
+
+void Scene::setAnimationFPS(float fps)
+{
+  if (fps > 0.f)
+    m_animations.fps = fps;
+}
+
+int Scene::getAnimationFrame() const
+{
+  return static_cast<int>(
+      std::round(m_animations.time * (m_animations.totalFrames - 1)));
+}
+
+void Scene::setAnimationFrame(int frame)
+{
+  int clamped = std::clamp(frame, 0, m_animations.totalFrames - 1);
+  setAnimationTime(
+      static_cast<float>(clamped) / (m_animations.totalFrames - 1));
+}
+
+void Scene::incrementAnimationFrame()
+{
+  int frame = getAnimationFrame() + 1;
+  if (frame >= m_animations.totalFrames)
+    frame = 0;
+  setAnimationFrame(frame);
+}
+
+Animation *Scene::addKeyframeAnimation(const char *name, LayerNodeRef node)
+{
+  auto *anim = addAnimation(name);
+  anim->setKeyframeTargetNode(node);
+  return anim;
+}
+
 void Scene::removeUnusedObjects(bool includeRenderersAndCameras)
 {
   tsd::core::logStatus("Removing unused context objects");

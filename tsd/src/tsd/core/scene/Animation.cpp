@@ -21,6 +21,11 @@ static size_t calculateIndexForTime(
   return static_cast<size_t>(std::round(time * (numSteps - 1)));
 }
 
+static float lerpF(float a, float b, float t)
+{
+  return a + t * (b - a);
+}
+
 // Animation definitions //////////////////////////////////////////////////////
 
 Animation::Animation(Scene *s, const char *name) : m_scene(s), m_name(name) {}
@@ -102,6 +107,152 @@ void Animation::setAsTransformSteps(
   updateInfoString(0.f, false);
 }
 
+// Keyframe API ///////////////////////////////////////////////////////////////
+
+void Animation::setKeyframeTargetNode(LayerNodeRef node)
+{
+  m_keyframes.transformNode = node;
+}
+
+void Animation::setKeyframeTargetObject(Object &obj)
+{
+  m_keyframes.object = obj;
+}
+
+void Animation::addTransformKeyframe(float time, math::mat4 mat)
+{
+  time = std::clamp(time, 0.f, 1.f);
+  auto &kfs = m_keyframes.transformKeyframes;
+  // Replace existing keyframe within tolerance
+  for (auto &kf : kfs) {
+    if (std::abs(kf.time - time) < 1e-4f) {
+      kf.matrix = mat;
+      return;
+    }
+  }
+  // Insert sorted
+  TransformKeyframe kf{time, mat};
+  auto it = std::lower_bound(
+      kfs.begin(), kfs.end(), kf, [](const auto &a, const auto &b) {
+        return a.time < b.time;
+      });
+  kfs.insert(it, kf);
+}
+
+bool Animation::removeTransformKeyframe(size_t index)
+{
+  auto &kfs = m_keyframes.transformKeyframes;
+  if (index >= kfs.size())
+    return false;
+  kfs.erase(kfs.begin() + index);
+  return true;
+}
+
+void Animation::addValueKeyframe(
+    Token param, ANARIDataType type, float time, const void *value)
+{
+  time = std::clamp(time, 0.f, 1.f);
+  // Find or create channel
+  KeyframeChannel *chan = nullptr;
+  for (auto &c : m_keyframes.channels) {
+    if (c.parameterName == param) {
+      chan = &c;
+      break;
+    }
+  }
+  if (!chan) {
+    m_keyframes.channels.push_back({param, type, {}});
+    chan = &m_keyframes.channels.back();
+  }
+
+  ValueKeyframe kf{time, Any(type, value)};
+  // Replace existing
+  for (auto &existing : chan->keyframes) {
+    if (std::abs(existing.time - time) < 1e-4f) {
+      existing.value = kf.value;
+      return;
+    }
+  }
+  // Insert sorted
+  auto it = std::lower_bound(chan->keyframes.begin(),
+      chan->keyframes.end(),
+      kf,
+      [](const auto &a, const auto &b) { return a.time < b.time; });
+  chan->keyframes.insert(it, kf);
+}
+
+bool Animation::removeValueKeyframe(Token param, size_t index)
+{
+  for (auto &c : m_keyframes.channels) {
+    if (c.parameterName == param) {
+      if (index >= c.keyframes.size())
+        return false;
+      c.keyframes.erase(c.keyframes.begin() + index);
+      return true;
+    }
+  }
+  return false;
+}
+
+bool Animation::hasKeyframes() const
+{
+  return !m_keyframes.transformKeyframes.empty()
+      || !m_keyframes.channels.empty();
+}
+
+const std::vector<TransformKeyframe> &Animation::transformKeyframes() const
+{
+  return m_keyframes.transformKeyframes;
+}
+
+const std::vector<KeyframeChannel> &Animation::keyframeChannels() const
+{
+  return m_keyframes.channels;
+}
+
+LayerNodeRef Animation::keyframeTargetNode() const
+{
+  return m_keyframes.transformNode;
+}
+
+Any Animation::interpolateAny(
+    const Any &a, const Any &b, float alpha, ANARIDataType type)
+{
+  switch (type) {
+  case ANARI_FLOAT32: {
+    float va = a.get<float>();
+    float vb = b.get<float>();
+    return Any(lerpF(va, vb, alpha));
+  }
+  case ANARI_FLOAT32_VEC2: {
+    auto va = a.get<math::float2>();
+    auto vb = b.get<math::float2>();
+    math::float2 r{lerpF(va.x, vb.x, alpha), lerpF(va.y, vb.y, alpha)};
+    return Any(r);
+  }
+  case ANARI_FLOAT32_VEC3: {
+    auto va = a.get<math::float3>();
+    auto vb = b.get<math::float3>();
+    math::float3 r{lerpF(va.x, vb.x, alpha),
+        lerpF(va.y, vb.y, alpha),
+        lerpF(va.z, vb.z, alpha)};
+    return Any(r);
+  }
+  case ANARI_FLOAT32_VEC4: {
+    auto va = a.get<math::float4>();
+    auto vb = b.get<math::float4>();
+    math::float4 r{lerpF(va.x, vb.x, alpha),
+        lerpF(va.y, vb.y, alpha),
+        lerpF(va.z, vb.z, alpha),
+        lerpF(va.w, vb.w, alpha)};
+    return Any(r);
+  }
+  default:
+    // Snap to nearest for non-float types
+    return alpha < 0.5f ? a : b;
+  }
+}
+
 void Animation::update(float time)
 {
   auto &ts = m_timesteps;
@@ -123,13 +274,12 @@ void Animation::update(float time)
 
   if ((ts.stepsValues.empty() && ts.stepsArrays.empty()) || !ts.object
       || ts.parameterName.empty()) {
-    logWarning(
-        "[AnimatedTimeSeries::update()] incomplete animation object '%s'",
-        name().c_str());
-    return;
-  }
-
-  if (!ts.stepsValues.empty()) {
+    if (!hasKeyframes()) {
+      logWarning(
+          "[AnimatedTimeSeries::update()] incomplete animation object '%s'",
+          name().c_str());
+    }
+  } else if (!ts.stepsValues.empty()) {
     // TODO(jda): (linearly) interpolate between time steps for values?
     for (size_t i = 0; i < ts.stepsValues.size(); i++) {
       const auto &a = *ts.stepsValues[i];
@@ -145,6 +295,69 @@ void Animation::update(float time)
       ts.object->setParameterObject(ts.parameterName[i], *c[idx]);
     }
     updateInfoString(time, true);
+  }
+
+  // Keyframe animation //
+
+  auto &kf = m_keyframes;
+
+  if (!kf.transformKeyframes.empty() && kf.transformNode) {
+    const auto &kfs = kf.transformKeyframes;
+    math::mat4 result;
+    if (kfs.size() == 1) {
+      result = kfs[0].matrix;
+    } else if (time <= kfs.front().time) {
+      result = kfs.front().matrix;
+    } else if (time >= kfs.back().time) {
+      result = kfs.back().matrix;
+    } else {
+      // Binary search for surrounding pair
+      auto it = std::lower_bound(
+          kfs.begin(), kfs.end(), time, [](const TransformKeyframe &k, float t) {
+            return k.time < t;
+          });
+      const auto &k1 = *it;
+      const auto &k0 = *(it - 1);
+      float alpha = (time - k0.time) / (k1.time - k0.time);
+      // Element-wise mat4 lerp
+      for (int col = 0; col < 4; col++) {
+        result[col][0] = lerpF(k0.matrix[col][0], k1.matrix[col][0], alpha);
+        result[col][1] = lerpF(k0.matrix[col][1], k1.matrix[col][1], alpha);
+        result[col][2] = lerpF(k0.matrix[col][2], k1.matrix[col][2], alpha);
+        result[col][3] = lerpF(k0.matrix[col][3], k1.matrix[col][3], alpha);
+      }
+    }
+    (*kf.transformNode)->setAsTransform(result);
+    m_scene->signalLayerChange(kf.transformNode->container());
+  }
+
+  if (!kf.channels.empty() && kf.object) {
+    for (const auto &chan : kf.channels) {
+      const auto &cks = chan.keyframes;
+      if (cks.empty())
+        continue;
+
+      Any result;
+      if (cks.size() == 1) {
+        result = cks[0].value;
+      } else if (time <= cks.front().time) {
+        result = cks.front().value;
+      } else if (time >= cks.back().time) {
+        result = cks.back().value;
+      } else {
+        auto it = std::lower_bound(cks.begin(),
+            cks.end(),
+            time,
+            [](const ValueKeyframe &k, float t) { return k.time < t; });
+        const auto &vk1 = *it;
+        const auto &vk0 = *(it - 1);
+        float alpha = (time - vk0.time) / (vk1.time - vk0.time);
+        result = interpolateAny(vk0.value, vk1.value, alpha, chan.type);
+      }
+
+      if (result)
+        kf.object->setParameter(chan.parameterName, chan.type, result.data());
+    }
   }
 }
 

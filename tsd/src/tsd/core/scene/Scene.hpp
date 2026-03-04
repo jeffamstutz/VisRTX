@@ -212,6 +212,17 @@ struct Scene
   float getAnimationIncrement() const;
   void incrementAnimationTime();
 
+  int getAnimationTotalFrames() const;
+  void setAnimationTotalFrames(int frames); // clamp to >= 2
+  float getAnimationFPS() const;
+  void setAnimationFPS(float fps); // clamp to > 0
+
+  int getAnimationFrame() const; // round(time * (totalFrames - 1))
+  void setAnimationFrame(int frame); // setAnimationTime(frame / (totalFrames-1))
+  void incrementAnimationFrame(); // frame++ with loop wrap
+
+  Animation *addKeyframeAnimation(const char *name, LayerNodeRef node);
+
   ////////////////////////
   // Cleanup operations //
   ////////////////////////
@@ -248,6 +259,8 @@ struct Scene
   {
     float incrementSize{0.01f};
     float time{0.f};
+    int totalFrames{100};
+    float fps{24.f};
     std::vector<std::unique_ptr<Animation>> objects;
   } m_animations;
   struct MpiData

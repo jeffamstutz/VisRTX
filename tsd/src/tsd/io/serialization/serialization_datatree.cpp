@@ -422,6 +422,8 @@ void save_Scene(Scene &scene, core::DataNode &root, bool forceProxyArrays)
   auto &animationSettings = animationsRoot["settings"];
   animationSettings["time"] = scene.getAnimationTime();
   animationSettings["increment"] = scene.getAnimationIncrement();
+  animationSettings["totalFrames"] = scene.getAnimationTotalFrames();
+  animationSettings["fps"] = scene.getAnimationFPS();
 
   // ObjectDB //
 
@@ -539,6 +541,10 @@ void load_Scene(Scene &scene, core::DataNode &root)
     scene.setAnimationTime(animationSettings["time"].getValueAs<float>());
     scene.setAnimationIncrement(
         animationSettings["increment"].getValueAs<float>());
+    if (auto *tf = animationSettings.child("totalFrames"); tf != nullptr)
+      scene.setAnimationTotalFrames(tf->getValueAs<int>());
+    if (auto *fp = animationSettings.child("fps"); fp != nullptr)
+      scene.setAnimationFPS(fp->getValueAs<float>());
   } else {
     tsd::core::logStatus("  ...no animations found!");
   }
