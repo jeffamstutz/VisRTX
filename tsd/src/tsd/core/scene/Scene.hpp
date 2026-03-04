@@ -216,7 +216,7 @@ struct Scene
   // Cleanup operations //
   ////////////////////////
 
-  void removeUnusedObjects(bool includeRenderers = false);
+  void removeUnusedObjects(bool includeRenderersAndCameras = false);
   void defragmentObjectStorage();
   void cleanupScene(); // remove unused + defragment
 

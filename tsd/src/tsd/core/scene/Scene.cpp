@@ -743,7 +743,7 @@ void Scene::incrementAnimationTime()
   setAnimationTime(newTime);
 }
 
-void Scene::removeUnusedObjects(bool includeRenderers)
+void Scene::removeUnusedObjects(bool includeRenderersAndCameras)
 {
   tsd::core::logStatus("Removing unused context objects");
 
@@ -769,10 +769,11 @@ void Scene::removeUnusedObjects(bool includeRenderers)
   removeUnused(m_db.field);
   removeUnused(m_db.sampler);
   removeUnused(m_db.array);
-  removeUnused(m_db.camera);
 
-  if (includeRenderers)
+  if (includeRenderersAndCameras) {
     removeUnused(m_db.renderer);
+    removeUnused(m_db.camera);
+  }
 }
 
 void Scene::defragmentObjectStorage()

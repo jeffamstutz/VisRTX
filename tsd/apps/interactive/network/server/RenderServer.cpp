@@ -131,7 +131,9 @@ void RenderServer::setup_ANARIDevice()
   m_device = device;
   m_renderIndex = m_core.anari.acquireRenderIndex(scene, m_libName, device);
   m_camera = scene.defaultCamera();
-  m_renderers = scene.createStandardRenderers(m_libName, device);
+  m_renderers = scene.renderersOfDevice(m_libName).empty()
+      ? scene.createStandardRenderers(m_libName, device)
+      : scene.renderersOfDevice(m_libName);
   m_currentRenderer = m_renderers[0];
 }
 
@@ -319,6 +321,21 @@ void RenderServer::setup_Messaging()
       [this](const tsd::network::Message &msg) {
         tsd::network::messages::TransferLayer layerMsg(msg, &m_core.tsd.scene);
         layerMsg.execute();
+      });
+
+  m_server->registerHandler(MessageType::SERVER_SAVE_STATE_FILE,
+      [this](const tsd::network::Message &msg) {
+        std::string filename;
+        uint32_t pos = 0;
+        if (tsd::network::payloadRead(msg, pos, filename)) {
+          tsd::core::logStatus(
+              "[Server] Saving state file '%s' as requested by client.",
+              filename.c_str());
+          tsd::io::save_Scene(m_core.tsd.scene, filename.c_str());
+        } else {
+          tsd::core::logError(
+              "[Server] Invalid payload for SERVER_SAVE_STATE_FILE");
+        }
       });
 
   m_server->registerHandler(MessageType::SERVER_REQUEST_FRAME_CONFIG,

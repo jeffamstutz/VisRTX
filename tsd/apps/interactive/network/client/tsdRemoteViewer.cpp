@@ -40,6 +40,7 @@ struct Application : public TSDApplication
   std::shared_ptr<tsd::network::NetworkClient> m_client;
   std::string m_host{"127.0.0.1"};
   short m_port{12345};
+  std::string m_stateFileName{"state.tsd"};
 };
 
 // Application definitions ////////////////////////////////////////////////////
@@ -164,6 +165,25 @@ void Application::uiMainMenuBar()
     if (ImGui::MenuItem("Pause Rendering")) {
       tsd::core::logStatus("[Client] Sending STOP_RENDERING command");
       m_client->send(MessageType::SERVER_STOP_RENDERING);
+    }
+
+    ImGui::Separator();
+
+    if (ImGui::BeginMenu("Save State File")) {
+      ImGui::InputText("Filename", &m_stateFileName);
+      ImGui::Separator();
+      if (ImGui::Button("Save")) {
+        if (!m_stateFileName.empty()) {
+          tsd::core::logStatus(
+              "[Client] Sending command to save state file '%s'",
+              m_stateFileName.c_str());
+          auto msg =
+              tsd::network::makeMessage(MessageType::SERVER_SAVE_STATE_FILE);
+          tsd::network::payloadWrite(msg, m_stateFileName);
+          m_client->send(std::move(msg));
+        }
+      }
+      ImGui::EndMenu();
     }
 
     ImGui::Separator();

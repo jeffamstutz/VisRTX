@@ -61,6 +61,8 @@ struct StructuredMessage
 
 // Helper functions ///////////////////////////////////////////////////////////
 
+Message makeMessage(uint8_t type);
+
 // write to payload //
 
 template <typename T>
@@ -110,6 +112,13 @@ inline const tsd::core::DataTree &StructuredMessage::tree() const
 }
 
 // Helper functions //
+
+inline Message makeMessage(uint8_t type)
+{
+  Message msg;
+  msg.header.type = type;
+  return msg;
+}
 
 template <typename T>
 inline void payloadWrite(Message &msg, const T *data, uint32_t length)
