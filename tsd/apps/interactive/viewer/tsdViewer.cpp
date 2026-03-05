@@ -71,7 +71,6 @@ class Application : public TSDApplication
       viewport2->hide();
     tfeditor->hide();
     isoeditor->hide();
-    timeline->hide();
 
     // Populate scene //
 
@@ -126,7 +125,7 @@ class Application : public TSDApplication
     return R"layout(
 [Window][MainDockSpace]
 Pos=0,26
-Size=1920,1105
+Size=1920,1054
 Collapsed=0
 
 [Window][Debug##Default]
@@ -136,36 +135,36 @@ Collapsed=0
 
 [Window][Viewport]
 Pos=549,26
-Size=1371,848
+Size=1371,797
 Collapsed=0
 DockId=0x00000006,0
 
 [Window][Database Editor]
-Pos=0,603
-Size=547,528
+Pos=0,576
+Size=547,504
 Collapsed=0
 DockId=0x00000009,1
 
 [Window][Layers]
 Pos=0,26
-Size=547,575
+Size=547,548
 Collapsed=0
 DockId=0x00000008,0
 
 [Window][Object Editor]
-Pos=0,603
-Size=547,528
+Pos=0,576
+Size=547,504
 Collapsed=0
 DockId=0x00000009,0
 
 [Window][Log]
-Pos=549,876
+Pos=549,825
 Size=1371,255
 Collapsed=0
 DockId=0x00000005,0
 
 [Window][Terminal]
-Pos=549,876
+Pos=549,825
 Size=1371,255
 Collapsed=0
 DockId=0x00000005,1
@@ -183,26 +182,42 @@ Collapsed=0
 DockId=0x0000000C,0
 
 [Window][TF Editor]
-Pos=1370,26
-Size=550,590
+Pos=2483,26
+Size=550,1769
 Collapsed=0
 DockId=0x0000000B,0
 
 [Window][Camera Poses]
 Pos=0,26
-Size=547,575
+Size=547,548
 Collapsed=0
 DockId=0x00000008,2
 
 [Window][Animations]
 Pos=0,26
-Size=547,575
+Size=547,548
 Collapsed=0
 DockId=0x00000008,1
 
 [Window][##]
 Pos=792,507
 Size=336,116
+Collapsed=0
+
+[Window][Timeline]
+Pos=549,825
+Size=1371,255
+Collapsed=0
+DockId=0x00000005,2
+
+[Window][##blocking_task_modal]
+Pos=792,482
+Size=336,116
+Collapsed=0
+
+[Window][Cutting Plane]
+Pos=1293,781
+Size=446,232
 Collapsed=0
 
 [Table][0x44C159D3,2]
@@ -234,8 +249,36 @@ Column 1  Weight=1.0000
 Column 0  Weight=1.0000
 Column 1  Weight=1.0000
 
+[Table][0xF945472E,2]
+Column 0  Weight=1.0000
+Column 1  Weight=1.0000
+
+[Table][0xC7D50986,2]
+Column 0  Weight=1.0000
+Column 1  Weight=1.0000
+
+[Table][0x7AB8FCE0,2]
+Column 0  Weight=1.0000
+Column 1  Weight=1.0000
+
+[Table][0xC6287F21,2]
+Column 0  Weight=1.0000
+Column 1  Weight=1.0000
+
+[Table][0x3DC35996,2]
+Column 0  Weight=1.0000
+Column 1  Weight=1.0000
+
+[Table][0x7C7C00B3,2]
+Column 0  Weight=1.0000
+Column 1  Weight=1.0000
+
+[Table][0x7B5A3115,2]
+Column 0  Weight=1.0000
+Column 1  Weight=1.0000
+
 [Docking][Data]
-DockSpace         ID=0x80F5B4C5 Window=0x079D3A04 Pos=0,26 Size=1920,1105 Split=X
+DockSpace         ID=0x80F5B4C5 Window=0x079D3A04 Pos=0,26 Size=1920,1054 Split=X
   DockNode        ID=0x00000003 Parent=0x80F5B4C5 SizeRef=1368,1054 Split=X
     DockNode      ID=0x00000001 Parent=0x00000003 SizeRef=547,1105 Split=Y Selected=0xCD8384B1
       DockNode    ID=0x00000008 Parent=0x00000001 SizeRef=547,575 Selected=0xCD8384B1
