@@ -333,7 +333,7 @@ void Animation::update(float time)
       }
     }
     (*kf.transformNode)->setAsTransform(result);
-    m_scene->signalLayerChange(kf.transformNode->container());
+    m_scene->signalLayerTransformChanged(kf.transformNode->container());
   }
 
   if (!kf.channels.empty() && kf.object) {
