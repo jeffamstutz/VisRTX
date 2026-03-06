@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "tsd/core/scene/Object.hpp"
+#include "tsd/core/scene/ObjectUsePtr.hpp"
 
 namespace tsd::core {
 
@@ -24,6 +24,7 @@ struct SpatialField : public Object
 };
 
 using SpatialFieldRef = ObjectPoolRef<SpatialField>;
+using SpatialFieldAppRef = ObjectUsePtr<SpatialField, Object::UseKind::APP>;
 
 namespace tokens::spatial_field {
 

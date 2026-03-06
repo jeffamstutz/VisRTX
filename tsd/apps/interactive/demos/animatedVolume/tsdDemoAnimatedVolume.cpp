@@ -66,7 +66,6 @@ class Application : public TSDApplication
     auto field = scene.createObject<tsd::core::SpatialField>(
         tsd::core::tokens::spatial_field::structuredRegular);
     field->setName("jacobi_field");
-    solver->setField(field);
 
     auto volume = scene.createObject<tsd::core::Volume>(
         tsd::core::tokens::volume::transferFunction1D);
@@ -96,6 +95,8 @@ class Application : public TSDApplication
       auto valueRange = field->computeValueRange();
       volume->setParameter("valueRange", ANARI_FLOAT32_BOX1, &valueRange);
     });
+
+    solver->setField(field);
 
     return windows;
   }
