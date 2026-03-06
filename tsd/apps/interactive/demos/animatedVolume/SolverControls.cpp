@@ -4,6 +4,7 @@
 #include "SolverControls.h"
 // tsd_ui_imgui
 #include <tsd/ui/imgui/Application.h>
+#include <tsd/ui/imgui/tsd_ui_imgui.h>
 // tsd_core
 #include <tsd/core/Logging.hpp>
 // std
@@ -70,11 +71,8 @@ void SolverControls::buildUI()
     resetSolver();
   ImGui::EndDisabled();
   ImGui::Checkbox("auto update transfer function", &m_updateTF);
-
-  ImGui::Separator();
-
-  if (ImGui::Button("export .raw"))
-    exportRAW();
+  ImGui::Checkbox("dump volumes timesteps", &m_dumpVolumes);
+  ImGui::InputText("export root", &m_exportRoot);
 }
 
 void SolverControls::setField(tsd::core::SpatialFieldRef f)
@@ -226,6 +224,9 @@ void SolverControls::iterateSolver()
   tsd::core::logStatus("[jacobi solver] ...TSD update  (%i|%.2fms)",
       m_totalIterations,
       duration);
+
+  if (m_dumpVolumes)
+    exportRAW();
 }
 
 void SolverControls::exportRAW()
@@ -238,7 +239,7 @@ void SolverControls::exportRAW()
   filename.resize(100);
   filename.resize(std::snprintf(filename.data(),
       filename.size(),
-      "jacobi_%i_%zux%zux%zu_float32.raw",
+      "jacobi_%04d_%zux%zux%zu_float32.raw",
       m_totalIterations,
       nx,
       ny,
@@ -253,12 +254,13 @@ void SolverControls::exportRAW()
     m_dataHost->unmap();
   }
 
-  auto *fp = std::fopen(filename.c_str(), "wb");
+  auto location = m_exportRoot + "/" + filename;
+  auto *fp = std::fopen(location.c_str(), "wb");
   std::fwrite(
       m_dataHost->dataAs<float>(), sizeof(float), m_dataHost->size(), fp);
   std::fclose(fp);
 
-  tsd::core::logStatus("[jacobi solver] exported data to %s", filename.c_str());
+  tsd::core::logStatus("[jacobi solver] exported data to %s", location.c_str());
 }
 
 } // namespace tsd::demo

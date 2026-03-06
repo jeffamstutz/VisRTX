@@ -41,6 +41,8 @@ struct SolverControls : public tsd::ui::imgui::Window
   bool m_playing{false};
   bool m_useGPUInterop{false};
   bool m_updateTF{true};
+  bool m_dumpVolumes{false};
+  std::string m_exportRoot{"./"}; // root filename for .raw exports
 };
 
 } // namespace tsd::demo
