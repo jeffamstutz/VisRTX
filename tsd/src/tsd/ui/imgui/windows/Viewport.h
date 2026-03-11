@@ -87,7 +87,7 @@ struct Viewport : public BaseViewport
   float m_depthVisualMaximum{1.f};
   float m_edgeThreshold{0.5f};
   bool m_edgeInvert{false};
-  anari::DataType m_colorFormat = ANARI_UNKNOWN;
+  anari::DataType m_colorFormat{ANARI_UFIXED8_RGBA_SRGB};
 
   // Picking state //
 
