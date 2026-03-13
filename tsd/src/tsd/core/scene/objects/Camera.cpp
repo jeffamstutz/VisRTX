@@ -83,17 +83,31 @@ Camera::Camera(Token subtype) : Object(ANARI_CAMERA, subtype)
             "the field of view (angle in radians) of the frame's height")
         .setMin(math::radians(0.1f))
         .setMax(math::radians(179.9f));
-
-    addParameter("near").setDescription("near clip plane distance").setMin(0.f);
-    addParameter("far").setDescription("far clip plane distance").setMin(0.f);
-
+    addParameter("near")
+        .setValue(0.1f)
+        .setDescription("near clip plane distance")
+        .setMin(0.f)
+        .setEnabled(false);
+    addParameter("far")
+        .setValue(1000.f)
+        .setDescription("far clip plane distance")
+        .setMin(0.f)
+        .setEnabled(false);
   } else if (subtype == tokens::camera::orthographic) {
     addParameter("height")
         .setValue(1.f)
         .setDescription("height of the image plane in world units")
         .setMin(0.001f);
-    addParameter("near").setDescription("near clip plane distance").setMin(0.f);
-    addParameter("far").setDescription("far clip plane distance").setMin(0.f);
+    addParameter("near")
+        .setValue(0.1f)
+        .setDescription("near clip plane distance")
+        .setMin(0.f)
+        .setEnabled(false);
+    addParameter("far")
+        .setValue(1000.f)
+        .setDescription("far clip plane distance")
+        .setMin(0.f)
+        .setEnabled(false);
   } else if (subtype == tokens::camera::omnidirectional) {
     // KHR_CAMERA_OMNIDIRECTIONAL extension
     addParameter("layout")
