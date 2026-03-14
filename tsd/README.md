@@ -19,15 +19,15 @@ educational nature of TSD means API improvements are valued over stability.
 
 With that in mind, this repository has the following components:
 
-- [Core scene description library](src/)
-- [Single-file examples showing off specfic concepts](apps/simple/)
+- [Core collection of libraries](src/tsd)
+- [Single-file examples showing off specfic concepts](apps/tutorial/)
 - [Interactive ImGui-based viewer](apps/interactive/viewer/)
 - [Experimental MPI distributed viewer](apps/interactive/mpiViewer/)
 - [Basic unit tests](tests/)
 
-Generally `libtsd` follows 1:1 with ANARI's object hierarchy, defined in the
-ANARI specification
-[here](https://registry.khronos.org/ANARI/specs/1.0/ANARI-1.0.html).
+TSD's scene library (`tsd_scene`) generally follows 1:1 with ANARI's object
+hierarchy, defined in the ANARI specification
+[here](https://registry.khronos.org/ANARI/specs/1.1/ANARI-1.1.html).
 
 TSD is tested on Linux, but should work on other platforms (macOS + Windows).
 
