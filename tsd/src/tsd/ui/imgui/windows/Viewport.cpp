@@ -30,6 +30,7 @@ Viewport::Viewport(
     Application *app, tsd::rendering::Manipulator *m, const char *name)
     : BaseViewport(app, name)
 {
+  m_viewport.resolutionScale = 0.75f;
   BaseViewport::setManipulator(m);
   setLibrary("");
 }
@@ -261,7 +262,8 @@ void Viewport::loadSettings(tsd::core::DataNode &root)
   if (auto *c = root.child("currentCamera"); c) {
     uint64_t idx = 0;
     c->getValue(ANARI_UINT64, &idx);
-    m_camera.current = appContext()->tsd.scene.getObject<tsd::scene::Camera>(idx);
+    m_camera.current =
+        appContext()->tsd.scene.getObject<tsd::scene::Camera>(idx);
   }
 
   // Setup library //
@@ -367,8 +369,9 @@ void Viewport::imagePipeline_populate(tsd::rendering::RenderPipeline &p)
         id &= 0x7FFFFFFF;
       }
 
-      auto *obj = (id == ~0u) ? nullptr
-                              : appContext()->tsd.scene.getObject(objectType, id);
+      auto *obj = (id == ~0u)
+          ? nullptr
+          : appContext()->tsd.scene.getObject(objectType, id);
       appContext()->setSelected(obj);
     }
 
@@ -644,8 +647,21 @@ void Viewport::ui_menubar_Viewport()
       if (ImGui::RadioButton("12.5%", current == 0.125f))
         m_viewport.resolutionScale = 0.125f;
 
-      if (current != m_viewport.resolutionScale)
+      if (ImGui::BeginMenu("Custom")) {
+        ImGui::DragFloat("##customRes",
+            &m_viewport.resolutionScale,
+            0.01f,
+            0.1f,
+            2.f,
+            "%.2f");
+        ImGui::EndMenu();
+      }
+
+      if (current != m_viewport.resolutionScale) {
+        if (m_viewport.resolutionScale < 0.05f)
+          m_viewport.resolutionScale = 0.05f;
         viewport_reshape(m_viewport.size);
+      }
 
       ImGui::Unindent(INDENT_AMOUNT);
     }
