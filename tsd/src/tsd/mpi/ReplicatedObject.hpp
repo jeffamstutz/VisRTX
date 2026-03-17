@@ -10,6 +10,17 @@
 
 namespace tsd::mpi {
 
+/*
+ * MPI-replicated POD value that the main rank (rank 0) can write and all ranks
+ * can read; calling sync() broadcasts any pending update to worker ranks via
+ * MPI_Bcast, returning true if the value changed.
+ *
+ * Example:
+ *   ReplicatedObject<Config> cfg;
+ *   if (rank == 0) *cfg.write() = newConfig;
+ *   bool changed = cfg.sync();
+ *   const Config *c = cfg.read();
+ */
 template <typename T>
 struct ReplicatedObject
 {
