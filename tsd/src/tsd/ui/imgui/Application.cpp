@@ -214,6 +214,7 @@ void Application::teardown()
 {
   teardownUsdDevice();
   teardownTsdDevice();
+  appContext()->anari.releaseAllDevices();
   anari_viewer::ui::shutdown();
 }
 
