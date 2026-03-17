@@ -29,8 +29,10 @@ class SceneAnimation;
 } // namespace tsd::animation
 
 namespace tsd::io {
+// clang-format off
 void save_Scene(scene::Scene &, core::DataNode &, bool, animation::SceneAnimation *);
 void load_Scene(scene::Scene &, core::DataNode &, animation::SceneAnimation *);
+// clang-format on
 } // namespace tsd::io
 
 namespace tsd::scene {

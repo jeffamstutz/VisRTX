@@ -8,8 +8,8 @@ project_add_library(STATIC)
 project_sources(
 PRIVATE
   Animation.cpp
-  Apply.cpp
-  Evaluate.cpp
+  applyResults.cpp
+  evaluate.cpp
   SceneAnimation.cpp
   TimeSamples.cpp
 )
