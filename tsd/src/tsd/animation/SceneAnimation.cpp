@@ -10,7 +10,7 @@
 
 namespace tsd::animation {
 
-SceneAnimation::SceneAnimation(tsd::scene::Scene &scene) : m_scene(scene) {}
+SceneAnimation::SceneAnimation(tsd::scene::Scene &scene) : m_scene(&scene) {}
 
 SceneAnimation::~SceneAnimation() {}
 
@@ -51,7 +51,7 @@ void SceneAnimation::setAnimationTime(float time)
 
   if (!m_animations.empty()) {
     auto result = evaluate(m_animations, time);
-    applyResults(result, m_scene);
+    applyResults(result, *m_scene);
   }
 
   if (m_timeChangedCallback)

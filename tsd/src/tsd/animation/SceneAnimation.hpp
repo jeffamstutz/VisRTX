@@ -14,10 +14,16 @@ struct Scene;
 
 namespace tsd::animation {
 
-class SceneAnimation
+struct SceneAnimation
 {
- public:
-  explicit SceneAnimation(tsd::scene::Scene &scene);
+  SceneAnimation(tsd::scene::Scene &scene);
+
+  // Not movable or copyable
+  SceneAnimation(const SceneAnimation &) = delete;
+  SceneAnimation &operator=(const SceneAnimation &) = delete;
+  SceneAnimation(SceneAnimation &&) = delete;
+  SceneAnimation &operator=(SceneAnimation &&) = delete;
+
   ~SceneAnimation();
 
   using TimeChangedCallback = std::function<void(float)>;
@@ -47,7 +53,7 @@ class SceneAnimation
   void incrementAnimationFrame();
 
  private:
-  tsd::scene::Scene &m_scene;
+  tsd::scene::Scene *m_scene{nullptr};
   TimeChangedCallback m_timeChangedCallback;
   float m_incrementSize{0.01f};
   float m_time{0.f};
