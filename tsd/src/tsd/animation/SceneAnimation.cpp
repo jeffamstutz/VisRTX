@@ -96,17 +96,6 @@ void SceneAnimation::setAnimationTotalFrames(int frames)
   m_totalFrames = std::max(2, frames);
 }
 
-float SceneAnimation::getAnimationFPS() const
-{
-  return m_fps;
-}
-
-void SceneAnimation::setAnimationFPS(float fps)
-{
-  if (fps > 0.f)
-    m_fps = fps;
-}
-
 int SceneAnimation::getAnimationFrame() const
 {
   return static_cast<int>(std::round(m_time * (m_totalFrames - 1)));

@@ -292,12 +292,6 @@ void Timeline::buildUI_transport()
     if (ImGui::InputInt("Frames", &totalFrames, 1, 10))
       sceneAnim.setAnimationTotalFrames(totalFrames);
 
-    // FPS
-    float fps = sceneAnim.getAnimationFPS();
-    ImGui::TableNextColumn();
-    if (ImGui::DragFloat("FPS", &fps, 0.5f, 1.f, 240.f, "%.1f"))
-      sceneAnim.setAnimationFPS(fps);
-
     ImGui::PopStyleVar();
 
     ImGui::EndTable();

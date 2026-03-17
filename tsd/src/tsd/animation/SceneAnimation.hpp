@@ -43,8 +43,6 @@ struct SceneAnimation
   // Frame control
   int getAnimationTotalFrames() const;
   void setAnimationTotalFrames(int frames);
-  float getAnimationFPS() const;
-  void setAnimationFPS(float fps);
   int getAnimationFrame() const;
   void setAnimationFrame(int frame);
   void incrementAnimationFrame();
@@ -55,7 +53,6 @@ struct SceneAnimation
   float m_incrementSize{0.01f};
   float m_time{0.f};
   int m_totalFrames{100};
-  float m_fps{24.f};
   std::vector<Animation> m_animations;
 };
 

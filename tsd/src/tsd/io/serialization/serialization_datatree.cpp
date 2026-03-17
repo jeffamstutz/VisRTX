@@ -464,7 +464,6 @@ void save_Scene(Scene &scene,
     animationSettings["time"] = sceneAnim->getAnimationTime();
     animationSettings["increment"] = sceneAnim->getAnimationIncrement();
     animationSettings["totalFrames"] = sceneAnim->getAnimationTotalFrames();
-    animationSettings["fps"] = sceneAnim->getAnimationFPS();
   }
 
   // ObjectDB //
@@ -676,8 +675,6 @@ void load_Scene(Scene &scene,
           animationSettings["increment"].getValueAs<float>());
       if (auto *tf = animationSettings.child("totalFrames"); tf != nullptr)
         sceneAnim->setAnimationTotalFrames(tf->getValueAs<int>());
-      if (auto *fp = animationSettings.child("fps"); fp != nullptr)
-        sceneAnim->setAnimationFPS(fp->getValueAs<float>());
     } else {
       tsd::core::logStatus("  ...no animations found!");
     }
