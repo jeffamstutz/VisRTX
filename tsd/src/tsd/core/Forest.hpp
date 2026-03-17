@@ -13,6 +13,15 @@ namespace tsd::core {
 template <typename T>
 struct Forest;
 
+/*
+ * Intrusive tree node that stores a value and maintains parent, sibling, and
+ * child references within an owning Forest; accessed via ObjectPoolRef handles.
+ *
+ * Example:
+ *   auto child = node->insert_last_child(MyValue{});
+ *   child->value().name = "leaf";
+ *   child->erase_self();
+ */
 template <typename T>
 struct ForestNode
 {
@@ -75,6 +84,18 @@ template <typename T>
 bool operator!=(const ForestNode<T> &a, const ForestNode<T> &b);
 
 // clang-format off
+/*
+ * Virtual visitor base for Forest traversal; override preChildren/postChildren
+ * to execute logic before and after descending into each node's children.
+ *
+ * Example:
+ *   struct Printer : ForestVisitor<int> {
+ *     bool preChildren(ForestNode<int> &n, int lvl) override {
+ *       std::cout << *n << '\n'; return true;
+ *     }
+ *   };
+ *   Printer p; forest.traverse(forest.root(), p);
+ */
 template <typename T>
 struct ForestVisitor
 {
@@ -100,13 +121,16 @@ template <typename T>
 using ConstForestVisitorExitFunction =
     std::function<void(const ForestNode<T> &n, int level)>;
 
-///////////////////////////////////////////////////////////////////////////////
-// Forest<> -- a tree-based hierarchy free of cycles
-//
-//     Data structure based off of the stlab::forest<> described here:
-//        https://stlab.cc/2020/12/01/forest-introduction.html
-///////////////////////////////////////////////////////////////////////////////
-
+/*
+ * Cycle-free tree container (based on stlab::forest) backed by an ObjectPool;
+ * supports multi-level traversal, subtree copy/move, and ancestor queries.
+ * See: https://stlab.cc/2020/12/01/forest-introduction.html
+ *
+ * Example:
+ *   Forest<std::string> f("root");
+ *   auto child = f.insert_last_child(f.root(), "child");
+ *   f.traverse(f.root(), [](auto &n, int){ std::cout << *n; return true; });
+ */
 template <typename T>
 struct Forest
 {

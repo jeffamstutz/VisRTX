@@ -7,6 +7,17 @@
 
 namespace tsd::core {
 
+/*
+ * High-resolution interval timer that measures elapsed time between start()
+ * and end() calls, with exponential smoothing for stable per-frame metrics.
+ *
+ * Example:
+ *   Timer t;
+ *   t.start();
+ *   doWork();
+ *   t.end();
+ *   double ms = t.millisecondsSmoothed();
+ */
 struct Timer
 {
   void start();

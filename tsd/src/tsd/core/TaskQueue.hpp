@@ -17,6 +17,16 @@ namespace tsd::core {
 
 using Future = std::future<void>;
 
+/*
+ * Single-worker task queue that dispatches callable tasks onto a dedicated
+ * background thread; each enqueued task returns a Future for completion
+ * tracking.
+ *
+ * Example:
+ *   TaskQueue q(64);
+ *   Future f = q.enqueue([]{ doWork(); });
+ *   wait(f);
+ */
 struct TaskQueue
 {
   TaskQueue(size_t n);

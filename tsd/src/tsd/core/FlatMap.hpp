@@ -11,6 +11,16 @@
 
 namespace tsd::core {
 
+/*
+ * Sorted vector-based associative container offering key and index-based
+ * access; a lightweight alternative to std::map for small-to-medium sets.
+ *
+ * Example:
+ *   FlatMap<Token, int> m;
+ *   m["x"] = 42;
+ *   int *p = m.at("x"); // returns pointer or nullptr
+ *   m.erase("x");
+ */
 template <typename KEY, typename VALUE>
 struct FlatMap
 {

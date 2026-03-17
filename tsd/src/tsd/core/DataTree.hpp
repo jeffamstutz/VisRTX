@@ -21,6 +21,15 @@ namespace tsd::core {
 
 struct DataTree;
 
+/*
+ * Named node in a hierarchical tree that holds an Any value and an ordered
+ * list of named child nodes; supports typed get/set helpers and tree traversal.
+ *
+ * Example:
+ *   DataNode &n = tree.root()["material"];
+ *   n["roughness"] = 0.4f;
+ *   float r = n.child("roughness")->getValueAs<float>();
+ */
 struct DataNode
 {
   using Ptr = std::unique_ptr<DataNode>;
@@ -138,6 +147,16 @@ using DataTreeVisitorEntryFunction =
     std::function<bool(DataNode &n, int level)>;
 using DataTreeVisitorExitFunction = std::function<void(DataNode &n, int level)>;
 
+/*
+ * Non-copyable, non-movable tree of DataNode instances rooted at a single
+ * unnamed root node; supports serialization and depth-first traversal.
+ *
+ * Example:
+ *   DataTree tree;
+ *   tree.root()["width"] = 1920;
+ *   tree.root()["height"] = 1080;
+ *   tree.traverse([](DataNode &n, int lvl){ return true; }, {});
+ */
 struct DataTree
 {
   DataTree();

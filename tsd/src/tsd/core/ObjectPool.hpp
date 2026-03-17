@@ -16,6 +16,16 @@ constexpr size_t INVALID_INDEX = ~size_t(0);
 template <typename T>
 struct ObjectPoolRef;
 
+/*
+ * Sparse object store with O(1) insert and erase; slots are tracked by a
+ * bool marker array and recycled via a free-index stack.
+ *
+ * Example:
+ *   ObjectPool<MyObj> pool;
+ *   auto ref = pool.emplace(args...);
+ *   ref->doSomething();
+ *   pool.erase(ref.index());
+ */
 template <typename T>
 struct ObjectPool
 {
@@ -60,6 +70,15 @@ struct ObjectPool
   index_pool_t m_freeIndices;
 };
 
+/*
+ * Nullable reference into an ObjectPool that validates slot occupancy on
+ * every dereference; acts as a safe handle to a pool-managed object.
+ *
+ * Example:
+ *   ObjectPoolRef<MyObj> ref = pool.at(idx);
+ *   if (ref) ref->update();
+ *   size_t i = ref.index();
+ */
 template <typename T>
 struct ObjectPoolRef
 {

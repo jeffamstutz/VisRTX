@@ -13,6 +13,16 @@ namespace tsd::core {
 using ColorPoint = float4;
 using OpacityPoint = float2;
 
+/*
+ * Transfer function definition composed of RGBA color control points and
+ * scalar opacity control points, with an associated data value range.
+ *
+ * Example:
+ *   TransferFunction tf;
+ *   tf.range = {0.f, 1.f};
+ *   tf.colorPoints.push_back({1.f, 0.f, 0.f, 1.f});
+ *   tf.opacityPoints.push_back({0.5f, 1.f});
+ */
 struct TransferFunction
 {
   std::vector<ColorPoint> colorPoints;

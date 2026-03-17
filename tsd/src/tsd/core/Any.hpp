@@ -13,6 +13,16 @@
 
 namespace tsd::core {
 
+/*
+ * Type-erasure container that stores any ANARI data type value, including
+ * scalars, vectors, and strings, using fixed-size local storage where possible.
+ *
+ * Example:
+ *   Any a(ANARI_FLOAT32, &myFloat);
+ *   float v = a.get<float>();
+ *   a = std::string("hello");
+ *   bool isStr = a.is<std::string>();
+ */
 struct Any
 {
   static constexpr size_t INVALID_INDEX = ~size_t(0);
