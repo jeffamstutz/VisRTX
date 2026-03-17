@@ -21,6 +21,18 @@
 
 namespace tsd::rendering {
 
+/*
+ * Ordered sequence of ImagePass stages that renders to a shared ImageBuffers
+ * and exposes the final composited RGBA color buffer; passes are added via
+ * emplace_back and executed in insertion order each frame.
+ *
+ * Example:
+ *   ImagePipeline pipeline(1920, 1080);
+ *   pipeline.emplace_back<ClearBuffersPass>();
+ *   pipeline.emplace_back<AnariSceneRenderPass>(device);
+ *   pipeline.render();
+ *   auto *pixels = pipeline.getColorBuffer();
+ */
 struct ImagePipeline final
 {
   ImagePipeline();

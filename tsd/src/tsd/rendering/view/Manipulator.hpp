@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "tsd/core/TSDMath.hpp"
 #include "tsd/core/ObjectVersion.hpp"
+#include "tsd/core/TSDMath.hpp"
 // std
 #include <string>
 
@@ -22,6 +22,14 @@ enum class UpAxis
   NEG_Z
 };
 
+/*
+ * Value type that captures a named camera viewpoint as az/el/distance
+ * spherical coordinates relative to a look-at center, plus an up-axis.
+ *
+ * Example:
+ *   CameraPose p{"front", {0,0,0}, {0, 0, 5.f}};
+ *   manipulator.setConfig(p);
+ */
 struct CameraPose
 {
   std::string name;
@@ -31,6 +39,18 @@ struct CameraPose
   int upAxis{static_cast<int>(UpAxis::POS_Y)};
 };
 
+/*
+ * Orbit-style camera controller that tracks az/el/distance to a center point
+ * and exposes rotate/zoom/pan operations for interactive or scripted
+ * navigation.
+ *
+ * Example:
+ *   Manipulator m;
+ *   m.setConfig({0,0,0}, 5.f);
+ *   m.rotate({dx, dy});
+ *   m.zoom(scrollDelta);
+ *   anari::setParameter(d, cam, "position", m.eye());
+ */
 class Manipulator
 {
  public:

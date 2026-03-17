@@ -18,6 +18,16 @@ using namespace tsd::scene;
 
 struct RenderToAnariObjectsVisitor;
 
+/*
+ * Abstract BaseUpdateDelegate that maintains an ANARI world and handle cache
+ * for one device, translating Scene mutation signals into ANARI API calls;
+ * subclasses decide how layers are mapped to world instances.
+ *
+ * Example:
+ *   auto idx = std::make_unique<RenderIndexAllLayers>(scene, device);
+ *   idx->populate();
+ *   anari::World world = idx->world();
+ */
 struct RenderIndex : public BaseUpdateDelegate
 {
   RenderIndex(Scene &scene, tsd::core::Token deviceName, anari::Device d);

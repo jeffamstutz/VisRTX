@@ -9,6 +9,15 @@
 
 namespace tsd::rendering {
 
+/*
+ * ImagePass that renders a small orientation-axes overlay into the corner of
+ * the frame using a dedicated ANARI frame; updates when the view direction
+ * changes.
+ *
+ * Example:
+ *   auto *pass = pipeline.emplace_back<AnariAxesRenderPass>(device,
+ * extensions); pass->setView(manipulator.dir(), manipulator.up());
+ */
 struct AnariAxesRenderPass : public ImagePass
 {
   AnariAxesRenderPass(anari::Device d, const anari::Extensions &e);

@@ -19,6 +19,15 @@ namespace tsd::rendering {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+/*
+ * LayerVisitor that accumulates the product of transform nodes along each
+ * path in a Layer forest and writes the resulting matrices onto ANARI Instance
+ * objects; used to synchronize layer transforms after structural changes.
+ *
+ * Example:
+ *   TransformsToAnariVisitor v(device, instanceArray.data());
+ *   layer.traverse_const(layer.root(), v);
+ */
 struct TransformsToAnariVisitor : public tsd::scene::LayerVisitor
 {
   TransformsToAnariVisitor(anari::Device d,

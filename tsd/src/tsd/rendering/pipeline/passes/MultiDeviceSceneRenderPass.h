@@ -12,6 +12,15 @@
 
 namespace tsd::rendering {
 
+/*
+ * ImagePass that drives one ANARI Frame per device in parallel and composites
+ * their results into a single color buffer; mirrors AnariSceneRenderPass but
+ * spans multiple ANARI devices.
+ *
+ * Example:
+ *   auto *pass = pipeline.emplace_back<MultiDeviceSceneRenderPass>(devices);
+ *   pass->setCamera(0, cam); pass->setWorld(0, world);
+ */
 struct MultiDeviceSceneRenderPass : public ImagePass
 {
   MultiDeviceSceneRenderPass(const std::vector<anari::Device> &devices);

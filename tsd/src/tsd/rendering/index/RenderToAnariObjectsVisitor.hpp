@@ -46,6 +46,16 @@ constexpr uint8_t objectMask_lights()
 
 ///////////////////////////////////////////////////////////////////////////////
 
+/*
+ * LayerVisitor that traverses a Layer forest and accumulates ANARI Surface,
+ * Volume, and Light handles into ANARI Instance objects, filtered by an
+ * optional inclusion mask and a per-object filter function.
+ *
+ * Example:
+ *   std::vector<anari::Instance> instances;
+ *   RenderToAnariObjectsVisitor v(device, cache, &instances, objectMask_all());
+ *   layer.traverse_const(layer.root(), v);
+ */
 struct RenderToAnariObjectsVisitor : public tsd::scene::LayerVisitor
 {
   RenderToAnariObjectsVisitor(anari::Device d,

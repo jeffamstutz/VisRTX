@@ -8,6 +8,15 @@
 
 namespace tsd::rendering {
 
+/*
+ * ImagePass that copies a caller-owned byte vector into the pipeline's
+ * internal color buffer; useful for injecting externally produced frames.
+ *
+ * Example:
+ *   std::vector<uint8_t> externalPixels = receive();
+ *   auto *pass = pipeline.emplace_back<CopyToColorBufferPass>();
+ *   pass->setExternalBuffer(externalPixels);
+ */
 struct CopyToColorBufferPass : public ImagePass
 {
   CopyToColorBufferPass();

@@ -10,6 +10,16 @@
 
 namespace tsd::rendering {
 
+/*
+ * POD struct holding pointers to all per-pixel output buffers (color, depth,
+ * object/primitive/instance IDs, albedo, normals) shared across pipeline
+ * passes.
+ *
+ * Example:
+ *   ImageBuffers b;
+ *   b.color = myColorBuffer;
+ *   pass.render(b, 0);
+ */
 struct ImageBuffers
 {
   uint32_t *color{nullptr};
@@ -22,6 +32,17 @@ struct ImageBuffers
   detail::ComputeStream stream{};
 };
 
+/*
+ * Abstract single-stage unit of work in an ImagePipeline; receives a shared
+ * ImageBuffers, can be independently enabled/disabled, and is resized by the
+ * pipeline when the output dimensions change.
+ *
+ * Example:
+ *   struct MyPass : ImagePass {
+ *     void render(ImageBuffers &b, int stageId) override { ... }
+ *   };
+ *   pipeline.emplace_back<MyPass>();
+ */
 struct ImagePass
 {
   ImagePass();

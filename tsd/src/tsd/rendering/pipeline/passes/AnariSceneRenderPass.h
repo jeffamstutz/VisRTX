@@ -9,6 +9,15 @@
 
 namespace tsd::rendering {
 
+/*
+ * ImagePass that drives a single ANARI Frame with a configurable camera,
+ * renderer, and world; optionally captures auxiliary AOV buffers
+ * (depth, normals, albedo, object/primitive/instance IDs).
+ *
+ * Example:
+ *   auto *pass = pipeline.emplace_back<AnariSceneRenderPass>(device);
+ *   pass->setCamera(cam); pass->setRenderer(rend); pass->setWorld(world);
+ */
 struct AnariSceneRenderPass : public ImagePass
 {
   AnariSceneRenderPass(anari::Device d);

@@ -16,6 +16,16 @@ enum class CameraPathInterpolationType
   SMOOTH
 };
 
+/*
+ * Configuration for CameraPath interpolation: selects linear or smooth
+ * easing, specifies frames per pose segment, playback FPS, and smoothness
+ * factor.
+ *
+ * Example:
+ *   CameraPathSettings settings;
+ *   settings.type = CameraPathInterpolationType::SMOOTH;
+ *   settings.framesPerSegment = 60;
+ */
 struct CameraPathSettings
 {
   CameraPathInterpolationType type{CameraPathInterpolationType::LINEAR};

@@ -7,6 +7,14 @@
 
 namespace tsd::rendering {
 
+/*
+ * ImagePass that draws a pixel-wide outline around the object whose ID matches
+ * a configured value, by scanning the objectId AOV buffer.
+ *
+ * Example:
+ *   auto *pass = pipeline.emplace_back<OutlineRenderPass>();
+ *   pass->setOutlineId(selectedObjectId);
+ */
 struct OutlineRenderPass : public ImagePass
 {
   OutlineRenderPass();

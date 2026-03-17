@@ -9,6 +9,15 @@
 
 namespace tsd::rendering {
 
+/*
+ * ImagePass that writes the current color buffer to an image file; in
+ * single-shot mode the pass disables itself after the first successful write.
+ *
+ * Example:
+ *   auto *pass = pipeline.emplace_back<SaveToFilePass>();
+ *   pass->setFilename("frame.png");
+ *   pass->setSingleShotMode(true);
+ */
 struct SaveToFilePass : public ImagePass
 {
   SaveToFilePass();

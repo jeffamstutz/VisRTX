@@ -9,6 +9,16 @@
 
 namespace tsd::rendering {
 
+/*
+ * RenderIndex that builds ANARI instances from one or more named Scene layers;
+ * supports per-layer include lists, object filtering, and separate light
+ * gathering.
+ *
+ * Example:
+ *   RenderIndexAllLayers idx(scene, deviceToken, anariDevice);
+ *   idx.populate();
+ *   idx.setFilterFunction([](auto *o){ return o->name() != "hidden"; });
+ */
 struct RenderIndexAllLayers : public RenderIndex
 {
   RenderIndexAllLayers(Scene &scene,

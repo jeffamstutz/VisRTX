@@ -19,6 +19,15 @@ enum class AOVType
   INSTANCE_ID
 };
 
+/*
+ * ImagePass that remaps a selected AOV channel (depth, albedo, normals,
+ * edge detection, or ID buffers) into the RGBA color buffer for debugging.
+ *
+ * Example:
+ *   auto *pass = pipeline.emplace_back<VisualizeAOVPass>();
+ *   pass->setAOVType(AOVType::DEPTH);
+ *   pass->setDepthRange(0.1f, 100.f);
+ */
 struct VisualizeAOVPass : public ImagePass
 {
   VisualizeAOVPass();

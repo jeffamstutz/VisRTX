@@ -7,6 +7,15 @@
 
 namespace tsd::rendering {
 
+/*
+ * RenderIndex that registers every Scene object directly in the ANARI world
+ * without any layer hierarchy; intended for flat/unstructured object
+ * collections.
+ *
+ * Example:
+ *   RenderIndexFlatRegistry idx(scene, deviceToken, anariDevice);
+ *   idx.populate();
+ */
 struct RenderIndexFlatRegistry : public RenderIndex
 {
   RenderIndexFlatRegistry(
