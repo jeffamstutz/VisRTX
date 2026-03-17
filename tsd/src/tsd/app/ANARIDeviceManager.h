@@ -21,6 +21,17 @@ enum class RenderIndexKind : int
 
 using DeviceInitParam = std::pair<std::string, tsd::core::Any>;
 
+/*
+ * Manages the lifecycle of ANARI devices and their associated RenderIndex
+ * instances; loads libraries on demand, reference-counts render indices per
+ * device, and fans update delegate signals to all active render indices.
+ *
+ * Example:
+ *   ANARIDeviceManager mgr;
+ *   auto device = mgr.loadDevice("visrtx");
+ *   auto *idx = mgr.acquireRenderIndex(scene, deviceToken, device);
+ *   mgr.releaseRenderIndex(device);
+ */
 struct ANARIDeviceManager
 {
   ANARIDeviceManager(const bool *verboseFlag = nullptr);
