@@ -14,6 +14,14 @@ namespace tsd::network {
 
 using MessageFuture = std::future<boost::system::error_code>;
 
+/*
+ * Shared base for network endpoints that manages an asio io_context, a TCP
+ * socket, and a dispatch table mapping message type bytes to handler callbacks.
+ *
+ * Example:
+ *   channel->registerHandler(MSG_UPDATE, [](auto msg) { handle(*msg); });
+ *   channel->send(MSG_PING);
+ */
 struct NetworkChannel : public std::enable_shared_from_this<NetworkChannel>
 {
   NetworkChannel();
@@ -68,6 +76,16 @@ struct NetworkChannel : public std::enable_shared_from_this<NetworkChannel>
   Message make_message(uint8_t type, const T *data, uint32_t count);
 };
 
+/*
+ * NetworkChannel that listens on a TCP port, accepts a single client
+ * connection, and supports restart without re-creating the acceptor.
+ *
+ * Example:
+ *   NetworkServer srv(9000);
+ *   srv.start();
+ *   srv.send(MSG_READY);
+ *   srv.stop();
+ */
 struct NetworkServer : public NetworkChannel
 {
   NetworkServer(short port);
@@ -83,6 +101,15 @@ struct NetworkServer : public NetworkChannel
   tcp::acceptor m_acceptor;
 };
 
+/*
+ * NetworkChannel that initiates a TCP connection to a remote host and port;
+ * can be connected and disconnected at any time after construction.
+ *
+ * Example:
+ *   NetworkClient client("127.0.0.1", 9000);
+ *   client.send(MSG_HELLO, payload.data(), payload.size());
+ *   client.disconnect();
+ */
 struct NetworkClient : public NetworkChannel
 {
   NetworkClient() = default;

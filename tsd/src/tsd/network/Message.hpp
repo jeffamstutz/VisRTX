@@ -30,6 +30,15 @@ using MessagePayload = std::vector<std::byte>;
 
 constexpr uint8_t MESSAGE_TYPE_INVALID = 255;
 
+/*
+ * Raw network message composed of a fixed-size header (type byte + payload
+ * length) and a variable-length byte payload; the unit exchanged over the wire.
+ *
+ * Example:
+ *   Message msg = makeMessage(MSG_PING);
+ *   payloadWrite(msg, &value, 1);
+ *   channel->send(std::move(msg));
+ */
 struct Message
 {
   struct Header
@@ -41,6 +50,18 @@ struct Message
   MessagePayload payload; // Actual payload data
 };
 
+/*
+ * Abstract base for messages that carry structured data serialized into a
+ * DataTree; subclasses populate the tree on the sender side and implement
+ * execute() to apply the deserialized contents on the receiver side.
+ *
+ * Example:
+ *   // sender:
+ *   channel->send(MSG_PARAM, ParameterChange(obj, param));
+ *   // receiver (inside registered handler):
+ *   ParameterChange pc(msg, scene);
+ *   pc.execute();
+ */
 struct StructuredMessage
 {
   StructuredMessage() = default;
