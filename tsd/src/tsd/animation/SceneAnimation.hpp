@@ -18,11 +18,8 @@ struct SceneAnimation
 {
   SceneAnimation(tsd::scene::Scene &scene);
 
-  // Not movable or copyable
-  SceneAnimation(const SceneAnimation &) = delete;
-  SceneAnimation &operator=(const SceneAnimation &) = delete;
-  SceneAnimation(SceneAnimation &&) = delete;
-  SceneAnimation &operator=(SceneAnimation &&) = delete;
+  TSD_NOT_COPYABLE(SceneAnimation)
+  TSD_NOT_MOVEABLE(SceneAnimation)
 
   ~SceneAnimation();
 

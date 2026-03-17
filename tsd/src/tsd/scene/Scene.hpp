@@ -60,13 +60,9 @@ struct ObjectDatabase
   ObjectPool<Camera> camera;
   ObjectPool<Renderer> renderer;
 
-  // Not copyable or moveable //
   ObjectDatabase() = default;
-  ObjectDatabase(const ObjectDatabase &) = delete;
-  ObjectDatabase(ObjectDatabase &&) = delete;
-  ObjectDatabase &operator=(const ObjectDatabase &) = delete;
-  ObjectDatabase &operator=(ObjectDatabase &&) = delete;
-  //////////////////////////////
+  TSD_NOT_MOVEABLE(ObjectDatabase)
+  TSD_NOT_COPYABLE(ObjectDatabase)
 };
 
 std::string objectDBInfo(const ObjectDatabase &db);
@@ -97,10 +93,8 @@ struct Scene
   Scene();
   ~Scene();
 
-  Scene(const Scene &) = delete;
-  Scene &operator=(const Scene &) = delete;
-  Scene(Scene &&) = delete;
-  Scene &operator=(Scene &&) = delete;
+  TSD_NOT_MOVEABLE(Scene)
+  TSD_NOT_COPYABLE(Scene)
 
   MaterialRef defaultMaterial();
   CameraRef defaultCamera();

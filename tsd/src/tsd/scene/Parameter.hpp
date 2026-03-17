@@ -6,6 +6,7 @@
 // tsd_core
 #include "tsd/core/Any.hpp"
 #include "tsd/core/Token.hpp"
+#include "tsd/core/TypeMacros.hpp"
 // std
 #include <string>
 #include <string_view>
@@ -24,6 +25,7 @@ enum ParameterUsageHint
   VALUE_RANGE_TRANSFORM = (1 << 3)
 };
 
+// clang-format off
 /*
  * Observer interface implemented by Object; receives notifications when a
  * Parameter's value changes or when a Parameter is removed from its parent.
@@ -34,6 +36,7 @@ enum ParameterUsageHint
  *     void removeParameter(const Parameter *p) override { ... }
  *   };
  */
+// clang-format on
 struct Parameter;
 struct ParameterObserver
 {
@@ -103,11 +106,8 @@ struct Parameter
   Parameter() = default;
   ~Parameter() = default;
 
-  Parameter(const Parameter &) = default;
-  Parameter(Parameter &&) = default;
-
-  Parameter &operator=(const Parameter &) = default;
-  Parameter &operator=(Parameter &&) = default;
+  TSD_DEFAULT_MOVEABLE(Parameter)
+  TSD_DEFAULT_COPYABLE(Parameter)
 
  private:
   friend struct Object;

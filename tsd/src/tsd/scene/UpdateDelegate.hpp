@@ -3,6 +3,9 @@
 
 #pragma once
 
+// tsd_core
+#include "tsd/core/TypeMacros.hpp"
+// tsd_scene
 #include "Layer.hpp"
 // std
 #include <memory>
@@ -53,11 +56,8 @@ struct BaseUpdateDelegate
   virtual void signalInvalidateCachedObjects() = 0;
   virtual void signalAnimationTimeChanged(float time) = 0;
 
-  // Not copyable or movable
-  BaseUpdateDelegate(const BaseUpdateDelegate &) = delete;
-  BaseUpdateDelegate &operator=(const BaseUpdateDelegate &) = delete;
-  BaseUpdateDelegate(BaseUpdateDelegate &&) = default;
-  BaseUpdateDelegate &operator=(BaseUpdateDelegate &&) = default;
+  TSD_NOT_COPYABLE(BaseUpdateDelegate)
+  TSD_DEFAULT_MOVEABLE(BaseUpdateDelegate)
 };
 
 /*

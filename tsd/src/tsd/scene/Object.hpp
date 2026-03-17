@@ -45,6 +45,7 @@ extern Token defaultToken;
 
 // Helper macros //////////////////////////////////////////////////////////////
 
+// Movable, not copyable
 #define DECLARE_OBJECT_DEFAULT_LIFETIME(TYPE_NAME)                             \
   TYPE_NAME(const TYPE_NAME &) = delete;                                       \
   TYPE_NAME &operator=(const TYPE_NAME &) = delete;                            \
@@ -74,8 +75,7 @@ struct Object : public ParameterObserver
   virtual ~Object();
 
   // Movable, not copyable
-  Object(const Object &) = delete;
-  Object &operator=(const Object &) = delete;
+  TSD_NOT_COPYABLE(Object)
   Object(Object &&);
   Object &operator=(Object &&);
 

@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "tsd/core/TypeMacros.hpp"
 // std
 #include <string>
 #include <string_view>
@@ -32,10 +33,8 @@ struct Token
   bool empty() const;
   operator bool() const;
 
-  Token(const Token &) = default;
-  Token &operator=(const Token &) = default;
-  Token(Token &&) = default;
-  Token &operator=(Token &&) = default;
+  TSD_DEFAULT_MOVEABLE(Token)
+  TSD_DEFAULT_COPYABLE(Token)
 
  private:
   const char *m_value{nullptr};

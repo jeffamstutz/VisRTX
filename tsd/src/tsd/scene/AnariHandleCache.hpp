@@ -54,6 +54,9 @@ struct AnariHandleCache
   anari::Device device{nullptr};
   tsd::core::Token deviceName;
 
+  TSD_NOT_COPYABLE(AnariHandleCache)
+  TSD_NOT_MOVEABLE(AnariHandleCache)
+
  private:
   void replaceHandle(anari::Object o, anari::DataType type, size_t i);
   anari::Object readHandle(anari::DataType type, size_t i) const;

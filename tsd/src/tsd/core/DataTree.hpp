@@ -6,6 +6,7 @@
 #include "tsd/core/Any.hpp"
 #include "tsd/core/DataStream.hpp"
 #include "tsd/core/Forest.hpp"
+#include "tsd/core/TypeMacros.hpp"
 // std
 #include <algorithm>
 #include <cstdint>
@@ -37,10 +38,9 @@ struct DataNode
 
   DataNode() = default;
   ~DataNode();
-  DataNode(const DataNode &) = default;
-  DataNode(DataNode &&) = default;
-  DataNode &operator=(const DataNode &) = default;
-  DataNode &operator=(DataNode &&v) = default;
+
+  TSD_DEFAULT_MOVEABLE(DataNode)
+  TSD_DEFAULT_COPYABLE(DataNode)
 
   const std::string &name() const;
 
@@ -186,12 +186,8 @@ struct DataTree
 
   void print();
 
-  // Not movable or copyable //
-
-  DataTree(const DataTree &) = delete;
-  DataTree &operator=(const DataTree &) = delete;
-  DataTree(DataTree &&) = delete;
-  DataTree &operator=(DataTree &&) = delete;
+  TSD_NOT_MOVEABLE(DataTree)
+  TSD_NOT_COPYABLE(DataTree)
 
  private:
   bool saveImpl(DataWriter &writer);
