@@ -14,6 +14,16 @@ struct Array;
 struct Object;
 struct Scene;
 
+/*
+ * Per-device cache of live ANARI object handles mirroring the Scene's object
+ * pools; handles are created on demand and released when the corresponding
+ * TSD object is removed.
+ *
+ * Example:
+ *   AnariHandleCache cache(scene, deviceToken, anariDevice);
+ *   auto h = cache.getHandle(ANARI_GEOMETRY, geom->index(), true);
+ *   cache.releaseHandle(ANARI_GEOMETRY, geom->index());
+ */
 struct AnariHandleCache
 {
   AnariHandleCache(Scene &scene, tsd::core::Token deviceName, anari::Device d);

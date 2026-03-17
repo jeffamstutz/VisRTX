@@ -14,7 +14,20 @@ struct Array;
 struct Object;
 struct Parameter;
 
-/// UpdateDelegate interface containing all signals from items in a TSD context
+/*
+ * Abstract observer interface that receives all mutating signals produced by
+ * a Scene: object creation/removal, parameter changes, layer edits, and
+ * animation time updates. Subclass to drive downstream systems (e.g.
+ * renderers).
+ *
+ * Example:
+ *   struct MyDelegate : BaseUpdateDelegate {
+ *     void signalParameterUpdated(const Object *o, const Parameter *p) override
+ *       { scheduleUpload(o, p); }
+ *     // ... implement remaining pure virtuals ...
+ *   };
+ *   scene.setUpdateDelegate(&myDelegate);
+ */
 struct BaseUpdateDelegate
 {
   BaseUpdateDelegate() = default;
@@ -47,7 +60,15 @@ struct BaseUpdateDelegate
   BaseUpdateDelegate &operator=(BaseUpdateDelegate &&) = default;
 };
 
-/// Update delegate that implements a 'no-op' for all signals
+/*
+ * Concrete BaseUpdateDelegate that silently discards every signal; useful as a
+ * placeholder or base for delegates that only need to handle a subset of
+ * events.
+ *
+ * Example:
+ *   EmptyUpdateDelegate noop;
+ *   scene.setUpdateDelegate(&noop);
+ */
 struct EmptyUpdateDelegate : public BaseUpdateDelegate
 {
   EmptyUpdateDelegate() = default;
@@ -75,7 +96,16 @@ struct EmptyUpdateDelegate : public BaseUpdateDelegate
   void signalAnimationTimeChanged(float) override {}
 };
 
-/// Update delegate that dispatches signals to N held other update delegates
+/*
+ * BaseUpdateDelegate that owns a list of child delegates and fans every signal
+ * out to each of them; enables multiple independent systems to observe a Scene.
+ *
+ * Example:
+ *   MultiUpdateDelegate multi;
+ *   multi.emplace<RenderDelegate>();
+ *   multi.emplace<NetworkDelegate>();
+ *   scene.setUpdateDelegate(&multi);
+ */
 struct MultiUpdateDelegate : public BaseUpdateDelegate
 {
   MultiUpdateDelegate() = default;

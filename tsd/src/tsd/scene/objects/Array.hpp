@@ -12,6 +12,16 @@
 
 namespace tsd::scene {
 
+/*
+ * Fixed-size typed data buffer that wraps host memory, CUDA device memory, or
+ * a proxy placeholder; maps to an ANARI array object and supports 1-3 dimensions.
+ *
+ * Example:
+ *   auto arr = scene.createArray(ANARI_FLOAT32_VEC3, 1024);
+ *   auto *ptr = arr->mapAs<float3>();
+ *   // fill ptr[0..1023] ...
+ *   arr->unmap();
+ */
 struct Array : public Object
 {
   // clang-format off

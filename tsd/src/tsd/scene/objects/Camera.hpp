@@ -7,6 +7,14 @@
 
 namespace tsd::scene {
 
+/*
+ * ANARI Camera object that defines the viewpoint and projection used during
+ * rendering; subtype selects perspective, orthographic, or omnidirectional.
+ *
+ * Example:
+ *   auto cam = scene.createObject<Camera>(tokens::camera::perspective);
+ *   cam->setParameter("fovy", 0.785f); // 45 degrees
+ */
 struct Camera : public Object
 {
   DECLARE_OBJECT_DEFAULT_LIFETIME(Camera);

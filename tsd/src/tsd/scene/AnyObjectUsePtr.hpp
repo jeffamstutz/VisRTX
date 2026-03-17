@@ -9,6 +9,15 @@ namespace tsd::scene {
 
 struct Scene;
 
+/*
+ * Type-erased owning pointer to any Object subclass that increments the
+ * object's APP use count on assignment and decrements it on release.
+ *
+ * Example:
+ *   AnyObjectUsePtr ptr(someObject);
+ *   auto *geom = ptr.getAs<Geometry>();
+ *   ptr.reset();
+ */
 struct AnyObjectUsePtr
 {
   AnyObjectUsePtr() = default;

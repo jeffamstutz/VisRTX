@@ -8,6 +8,14 @@
 
 namespace tsd::scene {
 
+/*
+ * ANARI Surface object that pairs a Geometry with a Material; when placed in
+ * a Layer it becomes a renderable instance in the scene.
+ *
+ * Example:
+ *   auto surf = scene.createSurface("myMesh", geomRef, matRef);
+ *   scene.insertChildObjectNode(layer->root(), surf);
+ */
 struct Surface : public Object
 {
   DECLARE_OBJECT_DEFAULT_LIFETIME(Surface);

@@ -24,6 +24,16 @@ enum ParameterUsageHint
   VALUE_RANGE_TRANSFORM = (1 << 3)
 };
 
+/*
+ * Observer interface implemented by Object; receives notifications when a
+ * Parameter's value changes or when a Parameter is removed from its parent.
+ *
+ * Example:
+ *   struct MyObj : ParameterObserver {
+ *     void parameterChanged(const Parameter *p, const Any &old) override { ... }
+ *     void removeParameter(const Parameter *p) override { ... }
+ *   };
+ */
 struct Parameter;
 struct ParameterObserver
 {
@@ -31,6 +41,16 @@ struct ParameterObserver
   virtual void removeParameter(const Parameter *p) = 0;
 };
 
+/*
+ * Named, typed value slot on an Object; supports optional min/max bounds,
+ * usage hints, string enumerations, and a builder-pattern setter API.
+ *
+ * Example:
+ *   obj.setParameter("radius", 0.5f);
+ *   auto *p = obj.parameter("radius");
+ *   p->setMin(0.f).setMax(10.f);
+ *   float r = p->value().get<float>();
+ */
 struct Parameter
 {
   Parameter(ParameterObserver *object, Token name);

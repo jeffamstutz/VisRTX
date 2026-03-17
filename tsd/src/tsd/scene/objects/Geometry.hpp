@@ -7,6 +7,14 @@
 
 namespace tsd::scene {
 
+/*
+ * ANARI Geometry object that describes renderable geometry (triangles, spheres,
+ * curves, etc.) through its parameter map and a device-specific subtype token.
+ *
+ * Example:
+ *   auto g = scene.createObject<Geometry>(tokens::geometry::sphere);
+ *   g->setParameter("primitive.radius", radiiArray);
+ */
 struct Geometry : public Object
 {
   DECLARE_OBJECT_DEFAULT_LIFETIME(Geometry);

@@ -17,6 +17,16 @@ struct Object;
 struct Layer;
 using InstanceParameterMap = FlatMap<std::string, Any>;
 
+/*
+ * Payload stored in each ForestNode of a Layer tree; holds a polymorphic Any
+ * value (transform matrix, Object reference, or empty), an enable flag,
+ * per-instance parameters, and optional default-value tracking.
+ *
+ * Example:
+ *   LayerNodeData nd(layer, mat4Transform, "root");
+ *   nd.setAsObject(surfacePtr);
+ *   nd.setEnabled(true);
+ */
 struct LayerNodeData
 {
   LayerNodeData() = default;

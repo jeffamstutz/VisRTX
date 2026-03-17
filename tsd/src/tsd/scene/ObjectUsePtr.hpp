@@ -7,6 +7,15 @@
 
 namespace tsd::scene {
 
+/*
+ * Typed owning smart pointer to an Object that automatically manages the
+ * object's use count for a specified UseKind (default APP) on copy and move.
+ *
+ * Example:
+ *   ObjectUsePtr<Material> mat = scene.createObject<Material>(subtype);
+ *   mat->setParameter("color", red);
+ *   mat.reset(); // use count decremented
+ */
 template <typename T, Object::UseKind K = Object::UseKind::APP>
 struct ObjectUsePtr
 {

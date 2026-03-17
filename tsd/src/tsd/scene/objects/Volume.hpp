@@ -7,6 +7,14 @@
 
 namespace tsd::scene {
 
+/*
+ * ANARI Volume object that visualizes volumetric data through a transfer
+ * function applied to a SpatialField; subtype selects the volume representation.
+ *
+ * Example:
+ *   auto vol = scene.createObject<Volume>(tokens::volume::transferFunction1D);
+ *   vol->setParameter("value", fieldRef);
+ */
 struct Volume : public Object
 {
   DECLARE_OBJECT_DEFAULT_LIFETIME(Volume);

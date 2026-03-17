@@ -33,6 +33,14 @@ namespace tsd::scene {
 
 struct BaseUpdateDelegate;
 
+/*
+ * Flat collection of ObjectPool instances, one per ANARI object type; serves
+ * as the canonical storage for all scene objects indexed by their pool slot.
+ *
+ * Example:
+ *   ObjectDatabase &db = scene.objectDB();
+ *   auto ref = db.geometry.at(idx);
+ */
 struct ObjectDatabase
 {
   ObjectPool<Array> array;
@@ -67,6 +75,17 @@ struct LayerState { LayerPtr ptr; bool active{true}; };
 using LayerMap = FlatMap<Token, LayerState>;
 // clang-format on
 
+/*
+ * Central scene container that owns all ANARI-typed objects, a named layer
+ * hierarchy, animations, and an optional update delegate; the main entry point
+ * for creating, retrieving, and removing scene content.
+ *
+ * Example:
+ *   Scene scene;
+ *   auto geom = scene.createObject<Geometry>(tokens::geometry::sphere);
+ *   auto surf = scene.createSurface("s", geom, mat);
+ *   scene.insertChildObjectNode(scene.defaultLayer()->root(), surf);
+ */
 struct Scene
 {
   Scene();

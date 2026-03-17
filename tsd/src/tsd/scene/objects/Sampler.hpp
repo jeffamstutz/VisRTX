@@ -7,6 +7,14 @@
 
 namespace tsd::scene {
 
+/*
+ * ANARI Sampler object that provides texture or data lookup for material
+ * parameters; subtype selects the sampling source (1D/2D/3D image, primitive, etc.).
+ *
+ * Example:
+ *   auto samp = scene.createObject<Sampler>(tokens::sampler::image2D);
+ *   samp->setParameter("image", textureArray);
+ */
 struct Sampler : public Object
 {
   DECLARE_OBJECT_DEFAULT_LIFETIME(Sampler);

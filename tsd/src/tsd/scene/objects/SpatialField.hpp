@@ -9,6 +9,14 @@ namespace tsd::scene {
 
 struct Scene;
 
+/*
+ * ANARI SpatialField object that holds the raw scalar or vector field data
+ * (e.g. structured-regular, NanoVDB) consumed by a Volume for rendering.
+ *
+ * Example:
+ *   auto field = scene.createObject<SpatialField>(tokens::spatial_field::structuredRegular);
+ *   field->setParameter("data", dataArray);
+ */
 struct SpatialField : public Object
 {
   DECLARE_OBJECT_DEFAULT_LIFETIME(SpatialField);

@@ -53,6 +53,16 @@ extern Token defaultToken;
 
 // Type declarations //////////////////////////////////////////////////////////
 
+/*
+ * Base class for all TSD scene objects; manages a named parameter map,
+ * reference-counted use tracking, optional metadata tree, and change-version
+ * counters, while delegating ANARI object creation to subclasses.
+ *
+ * Example:
+ *   auto geomRef = scene.createObject<Geometry>(tokens::geometry::sphere);
+ *   geomRef->setParameter("radius", 0.5f);
+ *   geomRef->setName("my sphere");
+ */
 struct Object : public ParameterObserver
 {
   using ParameterMap = FlatMap<Token, Parameter>;

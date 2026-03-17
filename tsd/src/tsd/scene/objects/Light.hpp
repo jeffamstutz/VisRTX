@@ -7,6 +7,14 @@
 
 namespace tsd::scene {
 
+/*
+ * ANARI Light object that illuminates the scene; subtype selects the light
+ * model (directional, point, HDRI, etc.) and parameters control its properties.
+ *
+ * Example:
+ *   auto light = scene.createObject<Light>(tokens::light::directional);
+ *   light->setParameter("direction", float3{0.f, -1.f, 0.f});
+ */
 struct Light : public Object
 {
   DECLARE_OBJECT_DEFAULT_LIFETIME(Light);

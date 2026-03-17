@@ -7,6 +7,14 @@
 
 namespace tsd::scene {
 
+/*
+ * ANARI Material object that controls the shading model and surface appearance
+ * through its parameter map and a device-specific subtype token.
+ *
+ * Example:
+ *   auto mat = scene.createObject<Material>(tokens::material::physicallyBased);
+ *   mat->setParameter("baseColor", float3{0.8f, 0.2f, 0.2f});
+ */
 struct Material : public Object
 {
   DECLARE_OBJECT_DEFAULT_LIFETIME(Material);
