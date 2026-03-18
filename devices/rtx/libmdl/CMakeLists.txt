@@ -16,12 +16,13 @@ project_add_library(STATIC
 )
 
 project_link_libraries(
+PRIVATE
+  fmt::fmt
+  nonstd::scope-lite
 PUBLIC
-  MDL_SDK::MDL_SDK
   nonstd::span-lite
   nonstd::expected-lite
-PRIVATE
-  fmt::fmt nonstd::scope-lite
+  MDL_SDK::MDL_SDK
 )
 
 project_include_directories(PUBLIC ..)

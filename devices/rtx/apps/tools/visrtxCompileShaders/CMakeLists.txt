@@ -28,9 +28,5 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 project(visrtxCompileShaders LANGUAGES CXX)
-add_executable(${PROJECT_NAME} main.cpp)
-target_link_libraries(${PROJECT_NAME}
-PRIVATE
-  anari_library_visrtx
-  anari::anari_static
-)
+project_add_executable(main.cpp)
+project_link_libraries(PRIVATE anari_library_visrtx anari::anari_static)

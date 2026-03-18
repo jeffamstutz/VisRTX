@@ -254,23 +254,28 @@ project_include_directories(
       ${PROJECT_INCLUDE_DIRS}
 )
 
+# NOTE(jda): Order matters here! We want local headers to be preferred over
+#            external ones. Example: NanoVDB could be incidentally on an include
+#            path from another target dependency, but we want to make sure ours
+#            is always used.
 project_link_libraries(
+PRIVATE
+  visrtx::glm
+  visrtx::fmt
+  visrtx::nanovdb
+  OptiX::OptiX
+  nonstd::expected-lite
+  nonstd::scope-lite
+  nonstd::span-lite
+  $<$<BOOL:${VISRTX_ENABLE_MDL_SUPPORT}>:stb_image>
 PUBLIC
   anari::anari_headers
 PRIVATE
   anari::helium
-  OptiX::OptiX
   CUDA::cuda_driver
   CUDA::curand
-  visrtx::glm
-  visrtx::fmt
-  visrtx::nanovdb
-  nonstd::expected-lite
-  nonstd::scope-lite
-  nonstd::span-lite
   $<$<BOOL:${VISRTX_ENABLE_NVTX}>:CUDA::nvToolsExt>
   $<$<BOOL:${VISRTX_ENABLE_MDL_SUPPORT}>:libmdl>
-  $<$<BOOL:${VISRTX_ENABLE_MDL_SUPPORT}>:stb_image>
 )
 
 project_compile_definitions(
@@ -328,14 +333,16 @@ function(GenerateEmbeddedPTX DIR BASE_NAME)
   )
 
   add_library(${INPUT_TARGET} OBJECT ${INPUT_CU_FILE})
+
+  # NOTE(jda): Order also matters here for the same reason as above.
   target_link_libraries(${INPUT_TARGET}
   PRIVATE
-    anari::anari
-    anari::helium
-    OptiX::OptiX
-    CUDA::curand
     visrtx::glm
     visrtx::nanovdb
+    OptiX::OptiX
+    anari::anari_headers
+    anari::helium
+    CUDA::curand
     $<$<BOOL:${VISRTX_ENABLE_MDL_SUPPORT}>:libmdl>
   )
   target_include_directories(${INPUT_TARGET}

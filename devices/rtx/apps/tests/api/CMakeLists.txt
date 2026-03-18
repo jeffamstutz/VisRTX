@@ -36,9 +36,9 @@ macro(make_test TEST_NAME)
   project_add_executable(${PROJECT_NAME}.cpp)
   project_link_libraries(
   PRIVATE
+    visrtx::stb_image
     anari_library_visrtx
     anari::anari_static
-    visrtx::stb_image
   )
   add_test(NAME ${PROJECT_NAME} COMMAND ${PROJECT_NAME})
 endmacro()
