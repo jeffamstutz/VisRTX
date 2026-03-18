@@ -9,6 +9,7 @@
 #include "tsd/scene/objects/Camera.hpp"
 // tsd_ui_imgui
 #include "tsd/ui/imgui/Application.h"
+#include "tsd/ui/imgui/tsd_ui_imgui.h"
 // std
 #include <algorithm>
 #include <cmath>
@@ -544,83 +545,85 @@ void Timeline::buildUI_canvas()
       ImGui::OpenPopup("##add_track_popup");
 
     if (ImGui::BeginPopup("##add_track_popup")) {
-      ImGui::Text("Select a transform node to animate:");
-      ImGui::Separator();
+      if (ImGui::BeginMenu("Transform Nodes")) {
+        for (size_t li = 0; li < scene.numberOfLayers(); li++) {
+          auto *layer = scene.layer(li);
+          if (!layer)
+            continue;
 
-      for (size_t li = 0; li < scene.numberOfLayers(); li++) {
-        auto *layer = scene.layer(li);
-        if (!layer)
-          continue;
+          int nodeIdx = 0;
+          layer->traverse(
+              layer->root(), [&](tsd::scene::LayerNode &node, int level) {
+                if (!node->isTransform() && node->name().empty())
+                  return true;
 
-        int nodeIdx = 0;
-        layer->traverse(
-            layer->root(), [&](tsd::scene::LayerNode &node, int level) {
-              if (!node->isTransform() && node->name().empty())
+                char menuLabel[128];
+                if (!node->name().empty()) {
+                  std::snprintf(menuLabel,
+                      sizeof(menuLabel),
+                      "%*s%s",
+                      level * 2,
+                      "",
+                      node->name().c_str());
+                } else {
+                  std::snprintf(menuLabel,
+                      sizeof(menuLabel),
+                      "%*s[xform %d]",
+                      level * 2,
+                      "",
+                      nodeIdx);
+                }
+                nodeIdx++;
+
+                ImGui::PushID(&node);
+                if (ImGui::MenuItem(menuLabel)) {
+                  auto nodeRef = layer->at(node.index());
+                  const char *animName =
+                      !node->name().empty() ? node->name().c_str() : menuLabel;
+                  auto &newAnim = animMgr.addAnimation(animName);
+                  newAnim.transforms.push_back({nodeRef, {}, {}, {}, {}});
+                  ImGui::CloseCurrentPopup();
+                }
+                ImGui::PopID();
                 return true;
+              });
+        }
 
-              char menuLabel[128];
-              if (!node->name().empty()) {
-                std::snprintf(menuLabel,
-                    sizeof(menuLabel),
-                    "%*s%s",
-                    level * 2,
-                    "",
-                    node->name().c_str());
-              } else {
-                std::snprintf(menuLabel,
-                    sizeof(menuLabel),
-                    "%*s[xform %d]",
-                    level * 2,
-                    "",
-                    nodeIdx);
-              }
-              nodeIdx++;
-
-              ImGui::PushID(static_cast<int>(li * 100000 + node.index()));
-              if (ImGui::MenuItem(menuLabel)) {
-                auto nodeRef = layer->at(node.index());
-                const char *animName =
-                    !node->name().empty() ? node->name().c_str() : menuLabel;
-                auto &newAnim = animMgr.addAnimation(animName);
-                newAnim.transforms.push_back({nodeRef, {}, {}, {}, {}});
-                ImGui::CloseCurrentPopup();
-              }
-              ImGui::PopID();
-              return true;
-            });
+        ImGui::EndMenu();
       }
 
       ImGui::Separator();
-      ImGui::Text("Cameras:");
 
-      const auto &cameraDB = scene.objectDB().camera;
-      tsd::core::foreach_item_const(cameraDB, [&](const auto *cam) {
-        if (!cam)
-          return;
-        char menuLabel[128];
-        const auto &camName = cam->name();
-        if (!camName.empty())
-          std::snprintf(menuLabel, sizeof(menuLabel), "%s", camName.c_str());
-        else
-          std::snprintf(
-              menuLabel, sizeof(menuLabel), "Camera [%zu]", cam->index());
-        ImGui::PushID(static_cast<int>(cam->index() + 900000));
-        if (ImGui::MenuItem(menuLabel)) {
-          auto &newAnim = animMgr.addAnimation(menuLabel);
-          auto *camPtr = const_cast<tsd::scene::Camera *>(cam);
-          newAnim.addObjectParameterBinding(camPtr,
-              "position", ANARI_FLOAT32_VEC3,
-              (const void *)nullptr, nullptr, 0);
-          newAnim.addObjectParameterBinding(camPtr,
-              "direction", ANARI_FLOAT32_VEC3,
-              (const void *)nullptr, nullptr, 0);
-          newAnim.addObjectParameterBinding(camPtr,
-              "up", ANARI_FLOAT32_VEC3,
-              (const void *)nullptr, nullptr, 0);
-          ImGui::CloseCurrentPopup();
+      if (scene.numberOfObjects(ANARI_CAMERA) > 0
+          && ImGui::BeginMenu("Cameras")) {
+        auto t = ANARI_CAMERA;
+        if (auto i = tsd::ui::buildUI_objects_menulist(scene, t);
+            i != TSD_INVALID_INDEX) {
+          auto cam = scene.getObject<tsd::scene::Camera>(i);
+          if (cam) {
+            auto &newAnim = animMgr.addAnimation(cam->name().c_str());
+            newAnim.addObjectParameterBinding(cam.data(),
+                "position",
+                ANARI_FLOAT32_VEC3,
+                (const void *)nullptr,
+                nullptr,
+                0);
+            newAnim.addObjectParameterBinding(cam.data(),
+                "direction",
+                ANARI_FLOAT32_VEC3,
+                (const void *)nullptr,
+                nullptr,
+                0);
+            newAnim.addObjectParameterBinding(cam.data(),
+                "up",
+                ANARI_FLOAT32_VEC3,
+                (const void *)nullptr,
+                nullptr,
+                0);
+          }
         }
-        ImGui::PopID();
-      });
+        ImGui::EndMenu();
+      }
 
       ImGui::EndPopup();
     }
