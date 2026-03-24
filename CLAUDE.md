@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **VisRTX** is an experimental NVIDIA implementation of the [Khronos ANARI](https://www.khronos.org/anari) (Analytic Rendering Interface) standard, focused on scientific visualization. It ships two ANARI device implementations and an optional testing/demo framework (TSD).
 
+All development should occur on top of the `next_release` branch, unless otherwise directed.
+
 ## Build
 
 ### Requirements
