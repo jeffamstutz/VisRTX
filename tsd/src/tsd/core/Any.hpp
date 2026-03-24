@@ -148,6 +148,9 @@ inline Any::Any(anari::DataType type, const void *v) : Any()
       std::memcpy(m_storage.data(), &v, anari::sizeOf(type));
     else
       std::memcpy(m_storage.data(), v, anari::sizeOf(type));
+  } else if (anari::isObject(type)) {
+    size_t idx = INVALID_INDEX;
+    std::memcpy(m_storage.data(), &idx, anari::sizeOf(idx));
   }
 }
 

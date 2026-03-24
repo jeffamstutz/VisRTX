@@ -3,8 +3,9 @@
 
 #include "tsd/scene/Object.hpp"
 #include "tsd/scene/AnariHandleCache.hpp"
-#include "tsd/core/Logging.hpp"
 #include "tsd/scene/Scene.hpp"
+// tsd_core
+#include "tsd/core/Logging.hpp"
 // std
 #include <algorithm>
 #include <iomanip>
@@ -25,10 +26,9 @@ static Any parseValue(anari::DataType type, const void *mem)
 {
   if (type == ANARI_STRING)
     return Any(ANARI_STRING, "");
-  else if (anari::isObject(type)) {
-    ANARIObject nullHandle = ANARI_INVALID_HANDLE;
-    return Any(type, &nullHandle);
-  } else if (mem)
+  else if (anari::isObject(type))
+    return Any(type, Any::INVALID_INDEX);
+  else if (mem)
     return Any(type, mem);
   else
     return {};
