@@ -8,6 +8,7 @@ project_add_library(STATIC)
 # CPU backend (always present)
 project_sources(PRIVATE
   cpu/toneMap.cpp
+  cpu/autoExposure.cpp
 )
 
 project_include_directories(
@@ -32,6 +33,7 @@ if (TSD_USE_CUDA)
 
   set(TSD_ALGORITHMS_CUDA_SOURCES
     cuda/toneMap.cu
+    cuda/autoExposure.cu
   )
   project_sources(PRIVATE ${TSD_ALGORITHMS_CUDA_SOURCES})
   set_source_files_properties(${TSD_ALGORITHMS_CUDA_SOURCES}

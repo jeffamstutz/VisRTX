@@ -2,45 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "AutoExposurePass.h"
+// tsd_algorithms
+#include "tsd/algorithms/cpu/autoExposure.hpp"
+#if TSD_ALGORITHMS_HAS_CUDA
+#include "tsd/algorithms/cuda/autoExposure.hpp"
+#endif
 // std
 #include <algorithm>
 #include <cmath>
-
-#include "detail/parallel_reduce.h"
 
 namespace tsd::rendering {
 
 namespace {
 
 constexpr uint32_t SAMPLE_COUNT = 16384;
-constexpr float MIN_LUMINANCE = 1e-4f;
 constexpr float MIN_EXPOSURE = -20.f;
 constexpr float MAX_EXPOSURE = 20.f;
 constexpr float MID_GRAY = 0.18f;
-
-float computeSumLogLuminance(
-    const ImageBuffers &b, uint32_t numSamples, uint32_t stride)
-{
-  // very approximate and suboptimal, going only through a handful of samples.
-  // Good enough for now.
-  // Might have to be revisited to be exhaustive and still high performance.
-  // https://gpuopen.com/fidelityfx-spd/ ?
-  const float *hdrColor = b.hdrColor;
-  const float minLum = MIN_LUMINANCE;
-  return detail::parallel_reduce(
-      b.stream,
-      0u,
-      numSamples,
-      0.f,
-      [=] HOST_DEVICE_FCN(uint32_t j) -> float {
-        const uint32_t idx = j * stride * 4;
-        const float lum = std::max(0.2126f * hdrColor[idx + 0]
-                + 0.7152f * hdrColor[idx + 1] + 0.0722f * hdrColor[idx + 2],
-            minLum);
-        return std::log2(lum);
-      },
-      [] HOST_DEVICE_FCN(float a, float b) -> float { return a + b; });
-}
 
 } // namespace
 
@@ -75,7 +53,18 @@ void AutoExposurePass::render(ImageBuffers &b, int stageId)
   if (numSamples == 0)
     return;
 
-  const float sumLogLum = computeSumLogLuminance(b, numSamples, stride);
+  float sumLogLum = 0.f;
+#if TSD_ALGORITHMS_HAS_CUDA
+  if (b.stream) {
+    sumLogLum = tsd::algorithms::cuda::sumLogLuminance(
+        b.stream, b.hdrColor, numSamples, stride);
+  } else
+#endif
+  {
+    sumLogLum =
+        tsd::algorithms::cpu::sumLogLuminance(b.hdrColor, numSamples, stride);
+  }
+
   const float avgLum = std::exp2(sumLogLum / float(numSamples));
   const float targetExposure =
       std::clamp(std::log2(MID_GRAY / avgLum), MIN_EXPOSURE, MAX_EXPOSURE);
