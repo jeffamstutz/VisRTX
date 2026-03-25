@@ -27,7 +27,7 @@ struct Window;
 struct UIConfig
 {
   float fontScale{1.f};
-  float rounding{9.f};
+  float rounding{4.f};
 };
 
 struct CommandLineOptions
@@ -75,6 +75,8 @@ class Application : public anari_viewer::Application
   virtual void teardown() override;
 
   // Internal API //
+
+  virtual void setupImGuiStyle();
 
   virtual void uiMainMenuBar();
 

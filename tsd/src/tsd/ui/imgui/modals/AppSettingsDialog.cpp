@@ -34,9 +34,11 @@ void AppSettingsDialog::applySettings()
   const auto *config = m_app->uiConfig();
 
   ImGuiIO &io = ImGui::GetIO();
-  io.FontGlobalScale = config->fontScale;
+  auto scale = config->fontScale;
+  io.FontGlobalScale = scale;
 
   ImGuiStyle &style = ImGui::GetStyle();
+  style.FramePadding = ImVec2(scale * 8.0f, scale * 4.0f);
   style.WindowRounding = config->rounding;
   style.ChildRounding = config->rounding;
   style.FrameRounding = config->rounding;
