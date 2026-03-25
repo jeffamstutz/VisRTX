@@ -4,18 +4,11 @@
 #pragma once
 
 #include "ImagePass.h"
+#include "tsd/algorithms/cpu/toneMap.hpp"
 
 namespace tsd::rendering {
 
-enum class ToneMapOperator
-{
-  NONE,
-  REINHARD,
-  ACES,
-  HABLE,
-  KHRONOS_PBR_NEUTRAL,
-  AGX
-};
+using ToneMapOperator = tsd::algorithms::ToneMapOperator;
 
 struct ToneMapPass : public ImagePass
 {
