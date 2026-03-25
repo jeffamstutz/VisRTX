@@ -11,6 +11,7 @@ project_sources(PRIVATE
   cpu/autoExposure.cpp
   cpu/outputTransform.cpp
   cpu/visualizeAOV.cpp
+  cpu/outline.cpp
 )
 
 project_include_directories(
@@ -38,6 +39,7 @@ if (TSD_USE_CUDA)
     cuda/autoExposure.cu
     cuda/outputTransform.cu
     cuda/visualizeAOV.cu
+    cuda/outline.cu
   )
   project_sources(PRIVATE ${TSD_ALGORITHMS_CUDA_SOURCES})
   set_source_files_properties(${TSD_ALGORITHMS_CUDA_SOURCES}
