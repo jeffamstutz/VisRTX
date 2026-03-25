@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "ImagePass.h"
+// tsd_algorithms
+#include "tsd/algorithms/cpu/convertColorBuffer.hpp"
+#if TSD_ALGORITHMS_HAS_CUDA
+#include "tsd/algorithms/cuda/convertColorBuffer.hpp"
+#endif
 // std
 #include <algorithm>
 #include <cstring>
@@ -9,8 +14,6 @@
 #if USE_CUDA
 #include "cuda_runtime.h"
 #endif
-
-#include "detail/parallel_transform.h"
 
 namespace tsd::rendering {
 
@@ -90,10 +93,13 @@ void memcpy_(void *dst, const void *src, size_t numBytes)
 void convertFloatColorBuffer_(
     ComputeStream stream, const float *v, uint8_t *out, size_t totalSize)
 {
-  detail::parallel_transform(
-      stream, v, v + totalSize, out, [] DEVICE_FCN(float v) {
-        return uint8_t(std::clamp(v, 0.f, 1.f) * 255);
-      });
+#if TSD_ALGORITHMS_HAS_CUDA
+  if (stream) {
+    tsd::algorithms::cuda::convertFloatToUint8(stream, v, out, totalSize);
+    return;
+  }
+#endif
+  tsd::algorithms::cpu::convertFloatToUint8(v, out, totalSize);
 }
 
 } // namespace detail

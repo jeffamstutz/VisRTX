@@ -12,6 +12,8 @@ project_sources(PRIVATE
   cpu/outputTransform.cpp
   cpu/visualizeAOV.cpp
   cpu/outline.cpp
+  cpu/clearBuffers.cpp
+  cpu/convertColorBuffer.cpp
 )
 
 project_include_directories(
@@ -40,6 +42,8 @@ if (TSD_USE_CUDA)
     cuda/outputTransform.cu
     cuda/visualizeAOV.cu
     cuda/outline.cu
+    cuda/clearBuffers.cu
+    cuda/convertColorBuffer.cu
   )
   project_sources(PRIVATE ${TSD_ALGORITHMS_CUDA_SOURCES})
   set_source_files_properties(${TSD_ALGORITHMS_CUDA_SOURCES}
