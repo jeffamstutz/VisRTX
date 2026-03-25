@@ -2,148 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "VisualizeAOVPass.h"
-// std
-#include <algorithm>
-
-#include "detail/parallel_for.h"
+// tsd_algorithms
+#include "tsd/algorithms/cpu/visualizeAOV.hpp"
+#if TSD_ALGORITHMS_HAS_CUDA
+#include "tsd/algorithms/cuda/visualizeAOV.hpp"
+#endif
 
 namespace tsd::rendering {
-
-// Thrust kernels /////////////////////////////////////////////////////////////
-
-// Same as visrtx gpu_utils.h
-DEVICE_FCN tsd::math::float3 makeRandomColor(uint32_t i)
-{
-  const uint32_t mx = 13 * 17 * 43;
-  const uint32_t my = 11 * 29;
-  const uint32_t mz = 7 * 23 * 63;
-  const uint32_t g = (i * (3 * 5 * 127) + 12312314);
-
-  if (i == ~0u)
-    return tsd::math::float3(0.0f);
-
-  return tsd::math::float3((g % mx) * (1.f / (mx - 1)),
-      (g % my) * (1.f / (my - 1)),
-      (g % mz) * (1.f / (mz - 1)));
-}
-
-void computeObjectIdImage(ImageBuffers &b, tsd::math::uint2 size)
-{
-  detail::parallel_for(
-      b.stream, 0u, uint32_t(size.x * size.y), [=] DEVICE_FCN(uint32_t i) {
-        uint32_t id = b.objectId ? b.objectId[i] : ~0u;
-        auto color = makeRandomColor(id);
-        b.color[i] = helium::cvt_color_to_uint32({color, 1.f});
-      });
-}
-
-void computePrimitiveIdImage(ImageBuffers &b, tsd::math::uint2 size)
-{
-  detail::parallel_for(
-      b.stream, 0u, uint32_t(size.x * size.y), [=] DEVICE_FCN(uint32_t i) {
-        uint32_t id = b.primitiveId ? b.primitiveId[i] : ~0u;
-        auto color = makeRandomColor(id);
-        b.color[i] = helium::cvt_color_to_uint32({color, 1.f});
-      });
-}
-
-void computeInstanceIdImage(ImageBuffers &b, tsd::math::uint2 size)
-{
-  detail::parallel_for(
-      b.stream, 0u, uint32_t(size.x * size.y), [=] DEVICE_FCN(uint32_t i) {
-        uint32_t id = b.instanceId ? b.instanceId[i] : ~0u;
-        auto color = makeRandomColor(id);
-        b.color[i] = helium::cvt_color_to_uint32({color, 1.f});
-      });
-}
-
-void computeDepthImage(
-    ImageBuffers &b, float minDepth, float maxDepth, tsd::math::uint2 size)
-{
-  detail::parallel_for(
-      b.stream, 0u, uint32_t(size.x * size.y), [=] DEVICE_FCN(uint32_t i) {
-        const float depth = b.depth ? b.depth[i] : 0.f;
-        const float range = maxDepth - minDepth;
-        const float v = range > 0.f
-            ? std::clamp((depth - minDepth) / range, 0.f, 1.f)
-            : 0.f;
-        b.color[i] = helium::cvt_color_to_uint32({tsd::math::float3(v), 1.f});
-      });
-}
-
-void computeAlbedoImage(ImageBuffers &b, tsd::math::uint2 size)
-{
-  detail::parallel_for(
-      b.stream, 0u, uint32_t(size.x * size.y), [=] DEVICE_FCN(uint32_t i) {
-        const auto albedo = b.albedo ? b.albedo[i] : tsd::math::float3(0.f);
-        b.color[i] = helium::cvt_color_to_uint32_srgb({albedo, 1.f});
-      });
-}
-
-void computeNormalImage(ImageBuffers &b, tsd::math::uint2 size)
-{
-  detail::parallel_for(
-      b.stream, 0u, uint32_t(size.x * size.y), [=] DEVICE_FCN(uint32_t i) {
-        const auto normal = b.normal ? b.normal[i] : tsd::math::float3(0.f);
-        // Map normals from [-1,1] to [0,1] for visualization
-        const auto visualNormal = (normal + 1.f) * 0.5f;
-        b.color[i] = helium::cvt_color_to_uint32({visualNormal, 1.f});
-      });
-}
-
-void computeEdgesImage(ImageBuffers &b, bool invert, tsd::math::uint2 size)
-{
-  detail::parallel_for(
-      b.stream, 0u, uint32_t(size.x * size.y), [=] DEVICE_FCN(uint32_t i) {
-        uint32_t y = i / size.x;
-        uint32_t x = i % size.x;
-
-        // Get center pixel object ID
-        uint32_t centerID = b.objectId ? b.objectId[i] : ~0u;
-
-        // Only check for edges if center pixel is not background
-        if (centerID == ~0u) {
-          b.color[i] =
-              helium::cvt_color_to_uint32({tsd::math::float3(0.f), 1.f});
-          return;
-        }
-
-        // Check if any neighbor has a different object ID (including
-        // background)
-        bool isEdge = false;
-
-        for (int dy = -1; dy <= 1 && !isEdge; ++dy) {
-          for (int dx = -1; dx <= 1 && !isEdge; ++dx) {
-            if (dx == 0 && dy == 0)
-              continue; // Skip center pixel
-
-            int nx = static_cast<int>(x) + dx;
-            int ny = static_cast<int>(y) + dy;
-
-            if (nx >= 0 && nx < static_cast<int>(size.x) && ny >= 0
-                && ny < static_cast<int>(size.y)) {
-              size_t neighborIdx =
-                  static_cast<size_t>(nx) + static_cast<size_t>(ny) * size.x;
-              uint32_t neighborID = b.objectId ? b.objectId[neighborIdx] : ~0u;
-
-              // Edge if neighbor has different ID (including background)
-              if (centerID != neighborID) {
-                isEdge = true;
-              }
-            }
-          }
-        }
-
-        float edgeValue = isEdge ? 1.f : 0.f;
-
-        if (invert) {
-          edgeValue = 1.f - edgeValue;
-        }
-
-        b.color[i] =
-            helium::cvt_color_to_uint32({tsd::math::float3(edgeValue), 1.f});
-      });
-}
 
 // VisualizeAOVPass definitions ///////////////////////////////////////////////
 
@@ -175,27 +40,63 @@ void VisualizeAOVPass::render(ImageBuffers &b, int stageId)
 
   const auto size = getDimensions();
 
+#if TSD_ALGORITHMS_HAS_CUDA
+  if (b.stream) {
+    namespace alg = tsd::algorithms::cuda;
+    switch (m_aovType) {
+    case AOVType::DEPTH:
+      alg::visualizeDepth(
+          b.stream, b.depth, b.color, m_minDepth, m_maxDepth, size.x, size.y);
+      break;
+    case AOVType::ALBEDO:
+      alg::visualizeAlbedo(b.stream, b.albedo, b.color, size.x, size.y);
+      break;
+    case AOVType::NORMAL:
+      alg::visualizeNormal(b.stream, b.normal, b.color, size.x, size.y);
+      break;
+    case AOVType::EDGES:
+      alg::visualizeEdges(
+          b.stream, b.objectId, b.color, m_edgeInvert, size.x, size.y);
+      break;
+    case AOVType::OBJECT_ID:
+      alg::visualizeId(b.stream, b.objectId, b.color, size.x, size.y);
+      break;
+    case AOVType::PRIMITIVE_ID:
+      alg::visualizeId(b.stream, b.primitiveId, b.color, size.x, size.y);
+      break;
+    case AOVType::INSTANCE_ID:
+      alg::visualizeId(b.stream, b.instanceId, b.color, size.x, size.y);
+      break;
+    default:
+      break;
+    }
+    return;
+  }
+#endif
+
+  namespace alg = tsd::algorithms::cpu;
   switch (m_aovType) {
   case AOVType::DEPTH:
-    computeDepthImage(b, m_minDepth, m_maxDepth, size);
+    alg::visualizeDepth(
+        b.depth, b.color, m_minDepth, m_maxDepth, size.x, size.y);
     break;
   case AOVType::ALBEDO:
-    computeAlbedoImage(b, size);
+    alg::visualizeAlbedo(b.albedo, b.color, size.x, size.y);
     break;
   case AOVType::NORMAL:
-    computeNormalImage(b, size);
+    alg::visualizeNormal(b.normal, b.color, size.x, size.y);
     break;
   case AOVType::EDGES:
-    computeEdgesImage(b, m_edgeInvert, size);
+    alg::visualizeEdges(b.objectId, b.color, m_edgeInvert, size.x, size.y);
     break;
   case AOVType::OBJECT_ID:
-    computeObjectIdImage(b, size);
+    alg::visualizeId(b.objectId, b.color, size.x, size.y);
     break;
   case AOVType::PRIMITIVE_ID:
-    computePrimitiveIdImage(b, size);
+    alg::visualizeId(b.primitiveId, b.color, size.x, size.y);
     break;
   case AOVType::INSTANCE_ID:
-    computeInstanceIdImage(b, size);
+    alg::visualizeId(b.instanceId, b.color, size.x, size.y);
     break;
   default:
     break;

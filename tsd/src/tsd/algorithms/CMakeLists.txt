@@ -10,6 +10,7 @@ project_sources(PRIVATE
   cpu/toneMap.cpp
   cpu/autoExposure.cpp
   cpu/outputTransform.cpp
+  cpu/visualizeAOV.cpp
 )
 
 project_include_directories(
@@ -36,6 +37,7 @@ if (TSD_USE_CUDA)
     cuda/toneMap.cu
     cuda/autoExposure.cu
     cuda/outputTransform.cu
+    cuda/visualizeAOV.cu
   )
   project_sources(PRIVATE ${TSD_ALGORITHMS_CUDA_SOURCES})
   set_source_files_properties(${TSD_ALGORITHMS_CUDA_SOURCES}
