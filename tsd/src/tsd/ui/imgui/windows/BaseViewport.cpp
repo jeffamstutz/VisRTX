@@ -5,6 +5,7 @@
 // tsd_rendering
 #include "tsd/rendering/view/ManipulatorToTSD.hpp"
 // tsd_ui_imgui
+#include "tsd/ui/imgui/Application.h"
 #include "tsd/ui/imgui/tsd_ui_imgui.h"
 
 namespace tsd::ui::imgui {
@@ -379,8 +380,10 @@ bool BaseViewport::ui_orientationWidget()
   if (!m_showOrientationWidget || !m_camera.arcball)
     return false;
 
+  auto *uiConfig = m_app->uiConfig();
+
   // Position widget in the bottom-right corner of the window
-  const float size = 150.f;
+  const float size = 150.f * uiConfig->fontScale;
   const ImVec2 winPos = ImGui::GetWindowPos();
   const ImVec2 winSize = ImGui::GetWindowSize();
   const float x = winPos.x;
