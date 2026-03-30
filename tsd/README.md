@@ -59,4 +59,5 @@ additional options may need to be enabled.
 
 ## Components
 
+- [Algorithms](src/tsd/algorithms/) — Data-processing kernels (for now tone mapping, auto exposure, AOV visualization, etc.) with CPU and optional CUDA backends
 - [Lua Scripting](src/tsd/scripting/) — Lua bindings and scripting API

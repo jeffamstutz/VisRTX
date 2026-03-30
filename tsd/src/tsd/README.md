@@ -8,6 +8,7 @@ ANARI integration layers.
 | Library | Directory | Description | Build Control |
 | --- | --- | --- | --- |
 | `anari_tsd` (`tsd_device`, `anari_library_tsd`) | [../anari_tsd/](../anari_tsd/) | ANARI device implementation backed by TSD, useful for exporting ANARI state for offline inspection in `tsdViewer`. | Built from `src/CMakeLists.txt` |
+| `tsd_algorithms` | [algorithms/](algorithms/) | Image-processing kernels (tone mapping, auto exposure, AOV visualization, outline, buffer ops) with CPU and optional CUDA backends. | Always enabled (CUDA backend requires `TSD_USE_CUDA=ON`) |
 | `tsd_app` | [app/](app/) | Application-facing glue for command-line import setup, ANARI device management, selection utilities, and offline sequence rendering. | Always enabled |
 | `tsd_core` | [core/](core/) | Foundational utilities including typed value storage, tokens, containers, serialization trees, logging, timing, and task queue support. | Always enabled |
 | `tsd_io` | [io/](io/) | File importers, procedural scene generators, scene serialization, and export paths (for example USD and NanoVDB). | Always enabled (some importers depend on optional build flags) |
