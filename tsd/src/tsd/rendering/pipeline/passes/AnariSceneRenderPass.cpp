@@ -3,34 +3,16 @@
 
 #include "AnariSceneRenderPass.h"
 #include "tsd/core/Logging.hpp"
+// tsd_algorithms
+#include "tsd/algorithms/cpu/depthCompositeFrame.hpp"
+#if TSD_ALGORITHMS_HAS_CUDA
+#include "tsd/algorithms/cuda/depthCompositeFrame.hpp"
+#endif
 // std
 #include <algorithm>
 #include <cstring>
-#include <limits>
-
-#include "detail/parallel_for.h"
 
 namespace tsd::rendering {
-
-// Thrust kernels /////////////////////////////////////////////////////////////
-
-void compositeFrame(ImageBuffers &b_out,
-    const ImageBuffers &b_in,
-    tsd::math::uint2 size,
-    bool firstPass)
-{
-  detail::parallel_for(
-      b_out.stream, 0u, uint32_t(size.x * size.y), [=] DEVICE_FCN(uint32_t i) {
-        const float currentDepth = b_in.depth[i];
-        const float incomingDepth = b_out.depth[i];
-        if (firstPass || currentDepth < incomingDepth) {
-          b_out.depth[i] = currentDepth;
-          b_out.color[i] = b_in.color[i];
-          if (b_in.objectId)
-            b_out.objectId[i] = b_in.objectId[i];
-        }
-      });
-}
 
 // Helper functions ///////////////////////////////////////////////////////////
 
@@ -421,7 +403,29 @@ void AnariSceneRenderPass::composite(ImageBuffers &b, int stageId)
     if (m_enableNormals)
       detail::copy(b.normal, m_buffers.normal, totalSize);
   } else {
-    compositeFrame(b, m_buffers, size, firstPass);
+    const uint32_t totalPixels = uint32_t(size.x) * uint32_t(size.y);
+#if TSD_ALGORITHMS_HAS_CUDA
+    if (b.stream) {
+      tsd::algorithms::cuda::depthCompositeFrame(b.stream,
+          b.color,
+          b.depth,
+          b.objectId,
+          m_buffers.color,
+          m_buffers.depth,
+          m_buffers.objectId,
+          totalPixels,
+          firstPass);
+      return;
+    }
+#endif
+    tsd::algorithms::cpu::depthCompositeFrame(b.color,
+        b.depth,
+        b.objectId,
+        m_buffers.color,
+        m_buffers.depth,
+        m_buffers.objectId,
+        totalPixels,
+        firstPass);
   }
 }
 

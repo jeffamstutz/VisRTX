@@ -14,6 +14,7 @@ project_sources(PRIVATE
   cpu/outline.cpp
   cpu/clearBuffers.cpp
   cpu/convertColorBuffer.cpp
+  cpu/depthCompositeFrame.cpp
 )
 
 project_include_directories(
@@ -44,6 +45,7 @@ if (TSD_USE_CUDA)
     cuda/outline.cu
     cuda/clearBuffers.cu
     cuda/convertColorBuffer.cu
+    cuda/depthCompositeFrame.cu
   )
   project_sources(PRIVATE ${TSD_ALGORITHMS_CUDA_SOURCES})
   set_source_files_properties(${TSD_ALGORITHMS_CUDA_SOURCES}
