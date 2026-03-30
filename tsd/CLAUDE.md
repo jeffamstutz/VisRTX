@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 TSD ("Testing Scene Description") is an **experimental** C++17 scene graph and testing framework for ANARI devices. It has no API stability guarantees. The parent repository is VisRTX; see `../CLAUDE.md` for the full project context.
 
+See [STYLEGUIDE.md](STYLEGUIDE.md) for TSD-specific and project-wide C++ coding conventions.
+
 ## Build
 
 TSD can be built standalone (without the VisRTX devices) or as part of VisRTX.

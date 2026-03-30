@@ -59,6 +59,8 @@ Google-style C++ formatting via `.clang-format`. C++17 throughout. Format with:
 clang-format -i <file>
 ```
 
+See [STYLEGUIDE.md](STYLEGUIDE.md) for detailed C++ and CUDA coding conventions.
+
 ## Architecture
 
 ### ANARI Devices (`devices/`)
