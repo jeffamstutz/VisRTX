@@ -4,7 +4,7 @@
 #include "ImagePass.h"
 // tsd_algorithms
 #include "tsd/algorithms/cpu/convertColorBuffer.hpp"
-#if TSD_ALGORITHMS_HAS_CUDA
+#ifdef TSD_ALGORITHMS_HAS_CUDA
 #include "tsd/algorithms/cuda/convertColorBuffer.hpp"
 #endif
 // std
@@ -93,7 +93,7 @@ void memcpy_(void *dst, const void *src, size_t numBytes)
 void convertFloatColorBuffer_(
     ComputeStream stream, const float *v, uint8_t *out, size_t totalSize)
 {
-#if TSD_ALGORITHMS_HAS_CUDA
+#ifdef TSD_ALGORITHMS_HAS_CUDA
   if (stream) {
     tsd::algorithms::cuda::convertFloatToUint8(stream, v, out, totalSize);
     return;

@@ -5,7 +5,7 @@
 #include "tsd/core/Logging.hpp"
 // tsd_algorithms
 #include "tsd/algorithms/cpu/depthCompositeFrame.hpp"
-#if TSD_ALGORITHMS_HAS_CUDA
+#ifdef TSD_ALGORITHMS_HAS_CUDA
 #include "tsd/algorithms/cuda/depthCompositeFrame.hpp"
 #endif
 // std
@@ -404,7 +404,7 @@ void AnariSceneRenderPass::composite(ImageBuffers &b, int stageId)
       detail::copy(b.normal, m_buffers.normal, totalSize);
   } else {
     const uint32_t totalPixels = uint32_t(size.x) * uint32_t(size.y);
-#if TSD_ALGORITHMS_HAS_CUDA
+#ifdef TSD_ALGORITHMS_HAS_CUDA
     if (b.stream) {
       tsd::algorithms::cuda::depthCompositeFrame(b.stream,
           b.color,

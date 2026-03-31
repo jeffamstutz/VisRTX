@@ -4,7 +4,7 @@
 #include "OutlineRenderPass.h"
 // tsd_algorithms
 #include "tsd/algorithms/cpu/outline.hpp"
-#if TSD_ALGORITHMS_HAS_CUDA
+#ifdef TSD_ALGORITHMS_HAS_CUDA
 #include "tsd/algorithms/cuda/outline.hpp"
 #endif
 
@@ -28,7 +28,7 @@ void OutlineRenderPass::render(ImageBuffers &b, int stageId)
 
   const auto size = getDimensions();
 
-#if TSD_ALGORITHMS_HAS_CUDA
+#ifdef TSD_ALGORITHMS_HAS_CUDA
   if (b.stream) {
     tsd::algorithms::cuda::outline(
         b.stream, b.objectId, b.color, m_outlineId, size.x, size.y);

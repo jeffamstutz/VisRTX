@@ -4,7 +4,7 @@
 #include "ClearBuffersPass.h"
 // tsd_algorithms
 #include "tsd/algorithms/cpu/clearBuffers.hpp"
-#if TSD_ALGORITHMS_HAS_CUDA
+#ifdef TSD_ALGORITHMS_HAS_CUDA
 #include "tsd/algorithms/cuda/clearBuffers.hpp"
 #endif
 // std
@@ -27,7 +27,7 @@ void ClearBuffersPass::render(ImageBuffers &b, int /*stageId*/)
   const auto c = helium::cvt_color_to_uint32(m_clearColor);
   const float inf = std::numeric_limits<float>::infinity();
 
-#if TSD_ALGORITHMS_HAS_CUDA
+#ifdef TSD_ALGORITHMS_HAS_CUDA
   if (b.stream) {
     using tsd::algorithms::cuda::fill;
     fill(b.stream, b.color, totalPixels, c);

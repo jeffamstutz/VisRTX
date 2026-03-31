@@ -4,7 +4,7 @@
 #include "OutputTransformPass.h"
 // tsd_algorithms
 #include "tsd/algorithms/cpu/outputTransform.hpp"
-#if TSD_ALGORITHMS_HAS_CUDA
+#ifdef TSD_ALGORITHMS_HAS_CUDA
 #include "tsd/algorithms/cuda/outputTransform.hpp"
 #endif
 // std
@@ -39,7 +39,7 @@ void OutputTransformPass::render(ImageBuffers &b, int stageId)
 
   const float invGamma = 1.f / m_gamma;
 
-#if TSD_ALGORITHMS_HAS_CUDA
+#ifdef TSD_ALGORITHMS_HAS_CUDA
   if (b.stream) {
     tsd::algorithms::cuda::outputTransform(b.stream,
         b.hdrColor,

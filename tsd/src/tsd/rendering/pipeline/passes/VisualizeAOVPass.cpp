@@ -4,7 +4,7 @@
 #include "VisualizeAOVPass.h"
 // tsd_algorithms
 #include "tsd/algorithms/cpu/visualizeAOV.hpp"
-#if TSD_ALGORITHMS_HAS_CUDA
+#ifdef TSD_ALGORITHMS_HAS_CUDA
 #include "tsd/algorithms/cuda/visualizeAOV.hpp"
 #endif
 
@@ -40,7 +40,7 @@ void VisualizeAOVPass::render(ImageBuffers &b, int stageId)
 
   const auto size = getDimensions();
 
-#if TSD_ALGORITHMS_HAS_CUDA
+#ifdef TSD_ALGORITHMS_HAS_CUDA
   if (b.stream) {
     namespace alg = tsd::algorithms::cuda;
     switch (m_aovType) {

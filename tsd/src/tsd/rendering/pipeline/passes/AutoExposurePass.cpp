@@ -4,7 +4,7 @@
 #include "AutoExposurePass.h"
 // tsd_algorithms
 #include "tsd/algorithms/cpu/autoExposure.hpp"
-#if TSD_ALGORITHMS_HAS_CUDA
+#ifdef TSD_ALGORITHMS_HAS_CUDA
 #include "tsd/algorithms/cuda/autoExposure.hpp"
 #endif
 // std
@@ -54,7 +54,7 @@ void AutoExposurePass::render(ImageBuffers &b, int stageId)
     return;
 
   float sumLogLum = 0.f;
-#if TSD_ALGORITHMS_HAS_CUDA
+#ifdef TSD_ALGORITHMS_HAS_CUDA
   if (b.stream) {
     sumLogLum = tsd::algorithms::cuda::sumLogLuminance(
         b.stream, b.hdrColor, numSamples, stride);

@@ -4,7 +4,7 @@
 #include "ToneMapPass.h"
 // tsd_algorithms
 #include "tsd/algorithms/cpu/toneMap.hpp"
-#if TSD_ALGORITHMS_HAS_CUDA
+#ifdef TSD_ALGORITHMS_HAS_CUDA
 #include "tsd/algorithms/cuda/toneMap.hpp"
 #endif
 // std
@@ -52,7 +52,7 @@ void ToneMapPass::render(ImageBuffers &b, int stageId)
       (m_autoExposureEnabled ? b.exposure : 0.f) + m_exposure;
   const float exposureScale = std::exp2(exposure);
 
-#if TSD_ALGORITHMS_HAS_CUDA
+#ifdef TSD_ALGORITHMS_HAS_CUDA
   if (b.stream) {
     tsd::algorithms::cuda::toneMap(
         b.stream, b.hdrColor, totalPixels, exposureScale, m_operator);
