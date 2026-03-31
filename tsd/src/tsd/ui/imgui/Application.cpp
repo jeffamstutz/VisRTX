@@ -120,6 +120,10 @@ anari_viewer::WindowArray Application::setupWindows()
   io.Fonts->ConfigData[0].FontDataOwnedByAtlas = false;
   io.FontDefault = font;
 
+  auto *window = sdlWindow();
+  SDL_MaximizeWindow(window);
+  m_uiConfig.fontScale = SDL_GetWindowDisplayScale(window);
+
   setupImGuiStyle();
 
   if (commandLineOptions()->useDefaultLayout)
@@ -212,6 +216,9 @@ void Application::uiFrameStart()
     doSave("state.tsd");
   else if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S))
     doSave();
+
+  if (ImGui::IsKeyPressed(ImGuiKey_F1, false))
+    printf("%s\n", ImGui::SaveIniSettingsToMemory());
 
   if (!modalActive && ImGui::IsKeyChordPressed(ImGuiKey_Escape))
     m_ctx.clearSelected();

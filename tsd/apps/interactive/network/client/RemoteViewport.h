@@ -39,7 +39,7 @@ struct RemoteViewport : public BaseViewport
 
   void renderer_resetParameterDefaults() override;
 
-  void reshape(tsd::math::int2 newWindowSize);
+  void viewport_reshape(tsd::math::int2 newWindowSize) override;
 
   void updateRenderer();
   void updateCamera();
@@ -68,6 +68,7 @@ struct RemoteViewport : public BaseViewport
   // Display //
 
   std::vector<uint8_t> m_incomingColorBuffer;
+  tsd::network::RenderSession::Frame::Config m_frameConfig;
 
   tsd::rendering::ClearBuffersPass *m_clearPass{nullptr};
   tsd::rendering::CopyToColorBufferPass *m_incomingFramePass{nullptr};

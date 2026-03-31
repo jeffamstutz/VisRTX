@@ -124,8 +124,8 @@ class Application : public TSDApplication
   {
     return R"layout(
 [Window][MainDockSpace]
-Pos=0,26
-Size=1920,1054
+Pos=0,56
+Size=3840,2206
 Collapsed=0
 
 [Window][Debug##Default]
@@ -134,38 +134,38 @@ Size=400,400
 Collapsed=0
 
 [Window][Viewport]
-Pos=549,26
-Size=1371,797
+Pos=901,56
+Size=2939,1524
 Collapsed=0
 DockId=0x00000006,0
 
 [Window][Database Editor]
-Pos=0,576
-Size=547,504
+Pos=0,1207
+Size=899,1055
 Collapsed=0
 DockId=0x00000009,1
 
 [Window][Layers]
-Pos=0,26
-Size=547,548
+Pos=0,56
+Size=899,1149
 Collapsed=0
 DockId=0x00000008,0
 
 [Window][Object Editor]
-Pos=0,576
-Size=547,504
+Pos=0,1207
+Size=899,1055
 Collapsed=0
 DockId=0x00000009,0
 
 [Window][Log]
-Pos=549,825
-Size=1371,255
+Pos=901,1582
+Size=2939,680
 Collapsed=0
 DockId=0x00000005,0
 
 [Window][Terminal]
-Pos=549,825
-Size=1371,255
+Pos=901,1582
+Size=2939,680
 Collapsed=0
 DockId=0x00000005,1
 
@@ -188,14 +188,14 @@ Collapsed=0
 DockId=0x0000000B,0
 
 [Window][Camera Poses]
-Pos=0,26
-Size=547,548
+Pos=0,56
+Size=899,1149
 Collapsed=0
 DockId=0x00000008,2
 
 [Window][Animations]
-Pos=0,26
-Size=547,548
+Pos=0,56
+Size=899,1149
 Collapsed=0
 DockId=0x00000008,1
 
@@ -205,14 +205,14 @@ Size=336,116
 Collapsed=0
 
 [Window][Timeline]
-Pos=549,825
-Size=1371,255
+Pos=901,1582
+Size=2939,680
 Collapsed=0
 DockId=0x00000005,2
 
 [Window][##blocking_task_modal]
 Pos=792,482
-Size=336,116
+Size=16,72
 Collapsed=0
 
 [Window][Cutting Plane]
@@ -278,16 +278,16 @@ Column 0  Weight=1.0000
 Column 1  Weight=1.0000
 
 [Docking][Data]
-DockSpace         ID=0x80F5B4C5 Window=0x079D3A04 Pos=0,26 Size=1920,1054 Split=X
+DockSpace         ID=0x80F5B4C5 Window=0x079D3A04 Pos=0,56 Size=3840,2206 Split=X
   DockNode        ID=0x00000003 Parent=0x80F5B4C5 SizeRef=1368,1054 Split=X
-    DockNode      ID=0x00000001 Parent=0x00000003 SizeRef=547,1105 Split=Y Selected=0xCD8384B1
+    DockNode      ID=0x00000001 Parent=0x00000003 SizeRef=899,1105 Split=Y Selected=0xCD8384B1
       DockNode    ID=0x00000008 Parent=0x00000001 SizeRef=547,575 Selected=0xCD8384B1
       DockNode    ID=0x00000009 Parent=0x00000001 SizeRef=547,528 Selected=0x82B4C496
-    DockNode      ID=0x00000002 Parent=0x00000003 SizeRef=1371,1105 Split=Y
-      DockNode    ID=0x00000004 Parent=0x00000002 SizeRef=1370,797 Split=X Selected=0xC450F867
+    DockNode      ID=0x00000002 Parent=0x00000003 SizeRef=2939,1105 Split=Y
+      DockNode    ID=0x00000004 Parent=0x00000002 SizeRef=1370,1524 Split=X Selected=0xC450F867
         DockNode  ID=0x00000006 Parent=0x00000004 SizeRef=685,848 CentralNode=1 Selected=0xC450F867
         DockNode  ID=0x00000007 Parent=0x00000004 SizeRef=683,848 Selected=0xA3219422
-      DockNode    ID=0x00000005 Parent=0x00000002 SizeRef=1370,255 Selected=0x139FDA3F
+      DockNode    ID=0x00000005 Parent=0x00000002 SizeRef=1370,680 Selected=0x139FDA3F
   DockNode        ID=0x0000000A Parent=0x80F5B4C5 SizeRef=550,1054 Split=Y Selected=0x3429FA32
     DockNode      ID=0x0000000B Parent=0x0000000A SizeRef=550,590 Selected=0x3429FA32
     DockNode      ID=0x0000000C Parent=0x0000000A SizeRef=550,462 Selected=0xBCE6538B

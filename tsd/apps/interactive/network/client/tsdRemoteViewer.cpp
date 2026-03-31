@@ -219,10 +219,6 @@ void Application::uiMainMenuBar()
     tsd::core::logStatus("[Client] Sending PING");
     m_client->send(MessageType::PING);
   }
-
-  if (ImGui::IsKeyPressed(ImGuiKey_F1, false)) {
-    printf("%s\n", ImGui::SaveIniSettingsToMemory());
-  }
 }
 
 void Application::teardown()
@@ -237,13 +233,13 @@ const char *Application::getDefaultLayout() const
 {
   return R"layout(
 [Window][MainDockSpace]
-Pos=0,26
-Size=1920,1054
+Pos=0,56
+Size=3840,2206
 Collapsed=0
 
 [Window][Viewport]
-Pos=549,26
-Size=1371,806
+Pos=957,56
+Size=2883,1683
 Collapsed=0
 DockId=0x00000003,0
 
@@ -254,8 +250,8 @@ Collapsed=0
 DockId=0x00000004,0
 
 [Window][Log]
-Pos=549,834
-Size=1371,246
+Pos=957,1741
+Size=2883,521
 Collapsed=0
 DockId=0x0000000A,0
 
@@ -265,14 +261,14 @@ Size=400,400
 Collapsed=0
 
 [Window][Layers]
-Pos=0,26
-Size=547,640
+Pos=0,56
+Size=955,1341
 Collapsed=0
 DockId=0x00000005,0
 
 [Window][Object Editor]
-Pos=0,668
-Size=547,412
+Pos=0,1399
+Size=955,863
 Collapsed=0
 DockId=0x00000006,0
 
@@ -283,8 +279,8 @@ Collapsed=0
 DockId=0x00000007,0
 
 [Window][Database Editor]
-Pos=0,668
-Size=547,412
+Pos=0,1399
+Size=955,863
 Collapsed=0
 DockId=0x00000006,1
 
@@ -319,19 +315,21 @@ Column 1  Weight=1.0000
 Column 0  Weight=1.0000
 Column 1  Weight=1.0000
 
+[Table][0x413D162D,1]
+Column 0  Weight=1.0000
+
 [Docking][Data]
-DockSpace       ID=0x782A6D6B Pos=0,25 Size=1920,1054 CentralNode=1 Selected=0x13926F0B
-DockSpace       ID=0x80F5B4C5 Window=0x079D3A04 Pos=0,26 Size=1920,1054 Split=X
-  DockNode      ID=0x00000001 Parent=0x80F5B4C5 SizeRef=547,1054 Split=Y Selected=0x6426B955
+DockSpace       ID=0x80F5B4C5 Window=0x079D3A04 Pos=0,56 Size=3840,2206 Split=X
+  DockNode      ID=0x00000001 Parent=0x80F5B4C5 SizeRef=955,1054 Split=Y Selected=0x6426B955
     DockNode    ID=0x00000007 Parent=0x00000001 SizeRef=547,581 Selected=0x6426B955
     DockNode    ID=0x00000008 Parent=0x00000001 SizeRef=547,522 Split=Y Selected=0x8B73155F
       DockNode  ID=0x00000005 Parent=0x00000008 SizeRef=547,640 Selected=0xCD8384B1
       DockNode  ID=0x00000006 Parent=0x00000008 SizeRef=547,412 Selected=0x82B4C496
-  DockNode      ID=0x00000002 Parent=0x80F5B4C5 SizeRef=1371,1054 Split=Y Selected=0xC450F867
-    DockNode    ID=0x00000009 Parent=0x00000002 SizeRef=1371,806 Split=X Selected=0xC450F867
+  DockNode      ID=0x00000002 Parent=0x80F5B4C5 SizeRef=2883,1054 Split=Y Selected=0xC450F867
+    DockNode    ID=0x00000009 Parent=0x00000002 SizeRef=1371,1683 Split=X Selected=0xC450F867
       DockNode  ID=0x00000003 Parent=0x00000009 SizeRef=686,857 CentralNode=1 Selected=0xC450F867
       DockNode  ID=0x00000004 Parent=0x00000009 SizeRef=683,857 Selected=0xA3219422
-    DockNode    ID=0x0000000A Parent=0x00000002 SizeRef=1371,246 Selected=0x139FDA3F
+    DockNode    ID=0x0000000A Parent=0x00000002 SizeRef=1371,521 Selected=0x139FDA3F
 )layout";
 }
 
