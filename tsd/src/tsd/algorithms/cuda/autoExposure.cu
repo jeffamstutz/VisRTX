@@ -22,7 +22,7 @@ float sumLogLuminance(cudaStream_t stream,
       thrust::cuda::par.on(stream),
       thrust::make_counting_iterator(0u),
       thrust::make_counting_iterator(numSamples),
-      [=] __device__(uint32_t j) -> float {
+      [=] __host__ __device__(uint32_t j) -> float {
         const uint32_t idx = j * stride * 4;
         const float lum =
             max(math::luminance(
@@ -31,7 +31,7 @@ float sumLogLuminance(cudaStream_t stream,
         return log2f(lum);
       },
       0.f,
-      [] __device__(float a, float b) -> float { return a + b; });
+      [] __host__ __device__(float a, float b) -> float { return a + b; });
 }
 
 float sumLogLuminance(
