@@ -7,10 +7,10 @@
 #endif
 
 #include "tsd/animation/AnimationManager.hpp"
-#include "tsd/io/animation/SpatialFieldFileBinding.hpp"
 #include "tsd/core/ColorMapUtil.hpp"
 #include "tsd/core/Logging.hpp"
 #include "tsd/core/TSDMath.hpp"
+#include "tsd/io/animation/SpatialFieldFileBinding.hpp"
 #include "tsd/io/importers.hpp"
 #include "tsd/io/importers/detail/HDRImage.h"
 #include "tsd/io/importers/detail/importer_common.hpp"
@@ -1348,9 +1348,8 @@ static void importUsdVolume(Scene &scene,
 
   if (filePaths.size() > 1) {
     auto &anim = animMgr.addAnimation(primName);
-    auto &fb = anim.emplaceFileBinding<SpatialFieldFileBinding>(
+    anim.emplaceFileBinding<SpatialFieldFileBinding>(
         &scene, volume.data(), field, std::move(filePaths));
-    fb.addCallbackToAnimation(anim);
   }
 }
 

@@ -42,9 +42,13 @@ struct FileBinding : public Binding
   // Write binding-specific data to node (called by animationToNode in tsd_io).
   virtual void toDataNode(core::DataNode &node) const = 0;
 
+ protected:
   // Register the runtime callback on anim.  Called both on first import and
   // after reconstruction from a DataNode during load_Scene.
   virtual void addCallbackToAnimation(Animation &anim) = 0;
+
+  friend struct Animation; // allow Animation to call addCallbackToAnimation()
+                           // on new bindings
 };
 
 // Inlined definitions ////////////////////////////////////////////////////////

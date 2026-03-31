@@ -25,7 +25,7 @@ namespace tsd::io {
  *   auto field0 = import_spatial_field(scene, files[0].c_str());
  *   auto vol = ...; // volume with field0 as "value"
  *   auto &b = anim.emplaceFileBinding<SpatialFieldFileBinding>(&scene,
- * vol.data(), field0, files); b.addCallbackToAnimation(anim);
+ * vol.data(), field0, files);
  *
  *   // Or use the higher-level helper:
  *   import_volume_animation(scene, animMgr, files, location);
@@ -46,12 +46,6 @@ struct SpatialFieldFileBinding : public tsd::animation::FileBinding
   // Writes targetIndex (the volume's object-pool index) and the file list.
   void toDataNode(tsd::core::DataNode &node) const override;
 
-  // Registers a CallbackBinding on `anim` that loads the appropriate file on
-  // each time change.  Does NOT add this binding to anim.fileBindings().
-  // Called both during initial import and during reconstruction from a
-  // DataNode.
-  void addCallbackToAnimation(tsd::animation::Animation &anim) override;
-
   void onDefragment(const scene::IndexRemapper &cb) override;
 
   // Load the appropriate file for time t.  No-ops if the frame has not changed.
@@ -61,6 +55,12 @@ struct SpatialFieldFileBinding : public tsd::animation::FileBinding
   int currentFrame() const;
 
  private:
+  // Registers a CallbackBinding on `anim` that loads the appropriate file on
+  // each time change.  Does NOT add this binding to anim.fileBindings().
+  // Called both during initial import and during reconstruction from a
+  // DataNode.
+  void addCallbackToAnimation(tsd::animation::Animation &anim) override;
+
   scene::ObjectUsePtr<scene::Volume, scene::Object::UseKind::ANIM> m_volume;
   scene::ObjectUsePtr<scene::SpatialField, scene::Object::UseKind::ANIM>
       m_currentField;

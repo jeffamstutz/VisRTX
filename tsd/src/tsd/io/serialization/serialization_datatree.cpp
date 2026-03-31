@@ -452,9 +452,8 @@ void nodeToAnimation(
           initialField = sf->self();
         }
 
-        auto &fb = anim.emplaceFileBinding<SpatialFieldFileBinding>(
+        anim.emplaceFileBinding<SpatialFieldFileBinding>(
             &scene, vol, initialField, std::move(files));
-        fb.addCallbackToAnimation(anim);
       }
     });
   }

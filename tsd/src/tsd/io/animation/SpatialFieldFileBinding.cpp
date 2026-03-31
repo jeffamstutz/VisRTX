@@ -39,12 +39,6 @@ void SpatialFieldFileBinding::toDataNode(core::DataNode &node) const
     filesNode.append() = f;
 }
 
-void SpatialFieldFileBinding::addCallbackToAnimation(
-    tsd::animation::Animation &anim)
-{
-  anim.addCallbackBinding([this](float t) { update(t); });
-}
-
 void SpatialFieldFileBinding::onDefragment(const scene::IndexRemapper &cb)
 {
   if (m_volume) {
@@ -96,6 +90,12 @@ size_t SpatialFieldFileBinding::frameCount() const
 int SpatialFieldFileBinding::currentFrame() const
 {
   return m_currentFrame;
+}
+
+void SpatialFieldFileBinding::addCallbackToAnimation(
+    tsd::animation::Animation &anim)
+{
+  anim.addCallbackBinding([this](float t) { update(t); });
 }
 
 } // namespace tsd::io

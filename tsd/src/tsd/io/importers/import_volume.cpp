@@ -164,9 +164,8 @@ VolumeRef import_volume_animation(Scene &scene,
   applyTransferFunction(scene, volume, transferFunction);
 
   auto &anim = animMgr.addAnimation(fileOf(files[0]).c_str());
-  auto &fb = anim.emplaceFileBinding<SpatialFieldFileBinding>(
+  anim.emplaceFileBinding<SpatialFieldFileBinding>(
       &scene, volume.data(), field, files);
-  fb.addCallbackToAnimation(anim);
 
   return volume;
 }
