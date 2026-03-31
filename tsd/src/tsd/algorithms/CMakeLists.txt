@@ -19,7 +19,7 @@ project_sources(PRIVATE
 
 project_include_directories(
 PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>/../..
 )
 
 project_link_libraries(PUBLIC tsd_core)
