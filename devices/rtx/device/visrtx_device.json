@@ -220,6 +220,13 @@
           "description": "stop refining the frame after this number of samples"
         },
         {
+          "name": "fixedAmbientLighting",
+          "types": ["ANARI_BOOL"],
+          "tags": [],
+          "default": true,
+          "description": "ignore 'ambientRaidance' and 'ambientColor' parameters on the renderer"
+        },
+        {
           "name": "denoise",
           "types": [
             "ANARI_BOOL"
@@ -294,7 +301,7 @@
             "ANARI_INT32"
           ],
           "tags": [],
-          "default": 1,
+          "default": 4,
           "minimum": 0,
           "description": "AO samples per-pixel, per-frame"
         },

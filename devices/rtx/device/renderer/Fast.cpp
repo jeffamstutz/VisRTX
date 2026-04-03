@@ -48,6 +48,11 @@ void Fast::commitParameters()
   Renderer::commitParameters();
   m_aoSamples = std::clamp(getParam<int>("ambientSamples", 1), 0, 256);
   m_aoBlend = std::clamp(getParam<float>("aoBlend", 1.f), 0.f, 1.f);
+  bool fixedAmbient = getParam<bool>("fixedAmbientLighting", true);
+  if (fixedAmbient) {
+    m_ambientIntensity = 1.f;
+    m_ambientColor = vec3{1.f};
+  }
 }
 
 void Fast::populateFrameData(FrameGPUData &fd) const
