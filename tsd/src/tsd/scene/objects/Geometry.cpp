@@ -6,7 +6,16 @@
 
 namespace tsd::scene {
 
-Geometry::Geometry(Token stype) : Object(ANARI_GEOMETRY, stype) {}
+Geometry::Geometry(Token stype) : Object(ANARI_GEOMETRY, stype)
+{
+  if (subtype() == tokens::geometry::cone
+      || subtype() == tokens::geometry::cylinder) {
+    addParameter("caps")
+        .setValue("none")
+        .setDescription("caps type: none, first, second, both")
+        .setStringValues({"none", "first", "second", "both"});
+  }
+}
 
 ObjectPoolRef<Geometry> Geometry::self() const
 {
