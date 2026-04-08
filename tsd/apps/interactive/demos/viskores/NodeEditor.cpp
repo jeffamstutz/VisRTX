@@ -282,6 +282,12 @@ NodeEditor::NodeEditor(tsd::ui::imgui::Application *app,
 
 void NodeEditor::buildUI()
 {
+  ImNodes::PushStyleVar(
+      ImNodesStyleVar_PinCircleRadius, 4.f * ImGui::GetIO().FontGlobalScale);
+  ImNodes::PushStyleVar(
+      ImNodesStyleVar_PinQuadSideLength, 8.f * ImGui::GetIO().FontGlobalScale);
+  ImNodes::PushStyleVar(ImNodesStyleVar_PinTriangleSideLength,
+      10.f * ImGui::GetIO().FontGlobalScale);
   ImNodes::BeginNodeEditor();
 
   updateNodeSummary();
@@ -293,6 +299,7 @@ void NodeEditor::buildUI()
 
   ImNodes::MiniMap();
   ImNodes::EndNodeEditor();
+  ImNodes::PopStyleVar(3);
 
   {
     if (!m_contextPinMenuVisible && ImNodes::IsPinHovered(&m_pinHoverId)) {
