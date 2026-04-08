@@ -42,8 +42,6 @@
 
 namespace visrtx {
 
-// Frame definitions //////////////////////////////////////////////////////////
-
 Frame::Frame(DeviceGlobalState *d) : helium::BaseFrame(d), m_denoiser(d)
 {
   cudaEventCreate(&m_eventStart);
@@ -200,6 +198,20 @@ bool Frame::getProperty(const std::string_view &name,
     auto &hd = data();
     helium::writeToVoidP(ptr, hd.fb.frameID);
     return true;
+  } else if (type == ANARI_FLOAT32 && name == "refinementProgress") {
+    if (!m_renderer)
+      return false;
+    if (flags & ANARI_WAIT)
+      wait();
+    const auto sampleLimit = m_renderer->sampleLimit();
+    if (sampleLimit <= 0)
+      return false;
+    else {
+      auto &hd = data();
+      const auto progress = float(hd.fb.frameID) / float(sampleLimit);
+      helium::writeToVoidP(ptr, progress);
+      return true;
+    }
   } else if (type == ANARI_BOOL && name == "nextFrameReset") {
     if (flags & ANARI_WAIT)
       wait();

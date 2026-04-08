@@ -26,6 +26,7 @@
 #include <functional>
 #include <future>
 #include <limits>
+#include <optional>
 #include <string>
 
 namespace tsd::ui::imgui {
@@ -91,7 +92,7 @@ struct Viewport : public BaseViewport
   bool m_showOverlay{true};
   bool m_highlightSelection{true};
   bool m_showOnlySelected{false};
-  int m_frameSamples{0};
+  std::optional<float> m_frameProgress{0.f};
 
   tsd::rendering::AOVType m_visualizeAOV{tsd::rendering::AOVType::NONE};
   float m_depthVisualMinimum{0.f};

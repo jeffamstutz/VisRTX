@@ -127,7 +127,6 @@ void Viewport::setLibrary(const std::string &libName, bool doAsync)
     auto d = adm.loadDevice(libName);
     m_libName = libName;
 
-    m_frameSamples = 0;
     m_latestFL = 0.f;
     m_minFL = std::numeric_limits<float>::infinity();
     m_maxFL = -std::numeric_limits<float>::infinity();
@@ -543,8 +542,14 @@ void Viewport::updateImage()
     return;
 
   auto frame = m_anariPass->getFrame();
-  anari::getProperty(
-      m_device, frame, "numSamples", m_frameSamples, ANARI_NO_WAIT);
+
+  float progress = 0.f;
+  auto haveProgress = anari::getProperty(
+      m_device, frame, "refinementProgress", progress, ANARI_NO_WAIT);
+  if (haveProgress)
+    m_frameProgress = progress;
+  else
+    m_frameProgress.reset();
 
   auto selectedNode = appContext()->getFirstSelected();
   const auto *selectedObject =
@@ -975,7 +980,10 @@ void Viewport::ui_overlay()
 
     ImGui::Separator();
 
-    ImGui::Text(" samples: %i", m_frameSamples);
+    if (m_frameProgress)
+      ImGui::Text("progress: %.2f%%", *m_frameProgress * 100.f);
+    else
+      ImGui::Text("progress: ---");
     ImGui::Text(" display: %.2fms", m_latestFL);
     ImGui::Text("   ANARI: %.2fms", m_latestAnariFL);
     ImGui::Text("   (min): %.2fms", m_minFL);
