@@ -5,6 +5,7 @@
 #include "catch.hpp"
 // tsd
 #include "tsd/scene/Object.hpp"
+#include "tsd/scene/Scene.hpp"
 
 namespace {
 
@@ -133,6 +134,91 @@ SCENARIO("tsd::Object interface", "[Object]")
         REQUIRE(arr2[1] == 2);
         REQUIRE(arr2[2] == 3);
       }
+    }
+  }
+}
+
+SCENARIO("tsd::Object clone for scene objects", "[Object]")
+{
+  GIVEN("A scene-owned surface with parameters and metadata")
+  {
+    tsd::scene::Scene scene;
+    auto geometry =
+        scene.createObject<tsd::scene::Geometry>(tsd::scene::tokens::geometry::sphere);
+    auto material = scene.createObject<tsd::scene::Material>(
+        tsd::scene::tokens::material::matte);
+    auto surface = scene.createSurface("primary_surface", geometry, material);
+    surface->setParameter("testFloat", 3.5f);
+    surface->setMetadataValue("priority", 7);
+    const int metadataArray[3] = {1, 2, 3};
+    surface->setMetadataArray("bins", ANARI_INT32, metadataArray, 3);
+
+    auto *clone = tsd::scene::cloneObject(surface.data());
+
+    THEN("The clone preserves type, subtype, references, parameters, and metadata")
+    {
+      REQUIRE(clone != nullptr);
+      REQUIRE(clone != surface.data());
+      REQUIRE(clone->type() == surface->type());
+      REQUIRE(clone->subtype() == surface->subtype());
+      REQUIRE(clone->name() == "primary_surface_clone");
+      REQUIRE(clone->numParameters() == surface->numParameters());
+      REQUIRE(clone->numMetadata() == surface->numMetadata());
+      REQUIRE(
+          clone->parameterValueAs<float>("testFloat").value() == Approx(3.5f));
+      REQUIRE(clone->getMetadataValue("priority").getAs<int>() == 7);
+
+      auto *cloneSurface = dynamic_cast<tsd::scene::Surface *>(clone);
+      REQUIRE(cloneSurface != nullptr);
+      REQUIRE(cloneSurface->geometry() == geometry.data());
+      REQUIRE(cloneSurface->material() == material.data());
+
+      anari::DataType type = ANARI_UNKNOWN;
+      const int *values = nullptr;
+      size_t size = 0;
+      clone->getMetadataArray("bins", &type, (const void **)&values, &size);
+      REQUIRE(type == ANARI_INT32);
+      REQUIRE(size == 3);
+      REQUIRE(values[0] == 1);
+      REQUIRE(values[1] == 2);
+      REQUIRE(values[2] == 3);
+    }
+
+    THEN("Changing the clone does not mutate the original")
+    {
+      REQUIRE(clone != nullptr);
+      clone->setParameter("testFloat", 9.f);
+      clone->setMetadataValue("priority", 99);
+
+      REQUIRE(
+          clone->parameterValueAs<float>("testFloat").value() == Approx(9.f));
+      REQUIRE(
+          surface->parameterValueAs<float>("testFloat").value() == Approx(3.5f));
+      REQUIRE(clone->getMetadataValue("priority").getAs<int>() == 99);
+      REQUIRE(surface->getMetadataValue("priority").getAs<int>() == 7);
+    }
+  }
+
+  GIVEN("A scene-owned renderer with a device name")
+  {
+    tsd::scene::Scene scene;
+    auto renderer = scene.createRenderer("visrtx", tsd::scene::tokens::defaultToken);
+    renderer->setName("main_renderer");
+    renderer->setParameter("ambientRadiance", 1.25f);
+    renderer->setMetadataValue("quality", 4);
+
+    auto *clone = tsd::scene::cloneObject(renderer.get());
+
+    THEN("The clone preserves renderer-specific state")
+    {
+      auto *rendererClone = dynamic_cast<tsd::scene::Renderer *>(clone);
+      REQUIRE(rendererClone != nullptr);
+      REQUIRE(rendererClone->rendererDeviceName() == "visrtx");
+      REQUIRE(rendererClone->subtype() == renderer->subtype());
+      REQUIRE(rendererClone->name() == "main_renderer_clone");
+      REQUIRE(rendererClone->parameterValueAs<float>("ambientRadiance").value()
+          == Approx(1.25f));
+      REQUIRE(rendererClone->getMetadataValue("quality").getAs<int>() == 4);
     }
   }
 }

@@ -4,11 +4,21 @@
 #include "tsd/scene/Object.hpp"
 #include "tsd/scene/AnariHandleCache.hpp"
 #include "tsd/scene/Scene.hpp"
+
+#ifndef TSD_USE_CUDA
+#define TSD_USE_CUDA 1
+#endif
+
 // tsd_core
 #include "tsd/core/Logging.hpp"
 // std
 #include <algorithm>
+#include <cstring>
 #include <iomanip>
+#include <tuple>
+#if TSD_USE_CUDA
+#include <cuda_runtime.h>
+#endif
 
 namespace tsd::scene {
 
@@ -32,6 +42,84 @@ static Any parseValue(anari::DataType type, const void *mem)
     return Any(type, mem);
   else
     return {};
+}
+
+static Object *createCloneDestination(Scene &scene, const Object &source)
+{
+  switch (source.type()) {
+  case ANARI_ARRAY:
+  case ANARI_ARRAY1D: {
+    auto &array = static_cast<const Array &>(source);
+    switch (array.kind()) {
+    case Array::MemoryKind::HOST:
+      return scene.createArray(array.elementType(), array.dim(0)).data();
+    case Array::MemoryKind::CUDA:
+      return scene.createArrayCUDA(array.elementType(), array.dim(0)).data();
+    case Array::MemoryKind::PROXY:
+      return scene.createArrayProxy(array.elementType(), array.dim(0)).data();
+    }
+    return nullptr;
+  }
+  case ANARI_ARRAY2D: {
+    auto &array = static_cast<const Array &>(source);
+    switch (array.kind()) {
+    case Array::MemoryKind::HOST:
+      return scene.createArray(array.elementType(), array.dim(0), array.dim(1))
+          .data();
+    case Array::MemoryKind::CUDA:
+      return scene
+          .createArrayCUDA(array.elementType(), array.dim(0), array.dim(1))
+          .data();
+    case Array::MemoryKind::PROXY:
+      return scene
+          .createArrayProxy(array.elementType(), array.dim(0), array.dim(1))
+          .data();
+    }
+    return nullptr;
+  }
+  case ANARI_ARRAY3D: {
+    auto &array = static_cast<const Array &>(source);
+    switch (array.kind()) {
+    case Array::MemoryKind::HOST:
+      return scene
+          .createArray(
+              array.elementType(), array.dim(0), array.dim(1), array.dim(2))
+          .data();
+    case Array::MemoryKind::CUDA:
+      return scene
+          .createArrayCUDA(
+              array.elementType(), array.dim(0), array.dim(1), array.dim(2))
+          .data();
+    case Array::MemoryKind::PROXY:
+      return scene
+          .createArrayProxy(
+              array.elementType(), array.dim(0), array.dim(1), array.dim(2))
+          .data();
+    }
+    return nullptr;
+  }
+  case ANARI_SURFACE:
+    return scene.createSurface().data();
+  case ANARI_GEOMETRY:
+    return scene.createObject<Geometry>(source.subtype()).data();
+  case ANARI_MATERIAL:
+    return scene.createObject<Material>(source.subtype()).data();
+  case ANARI_SAMPLER:
+    return scene.createObject<Sampler>(source.subtype()).data();
+  case ANARI_VOLUME:
+    return scene.createObject<Volume>(source.subtype()).data();
+  case ANARI_SPATIAL_FIELD:
+    return scene.createObject<SpatialField>(source.subtype()).data();
+  case ANARI_LIGHT:
+    return scene.createObject<Light>(source.subtype()).data();
+  case ANARI_CAMERA:
+    return scene.createObject<Camera>(source.subtype()).data();
+  case ANARI_RENDERER:
+    return scene.createRenderer(source.rendererDeviceName(), source.subtype())
+        .get();
+  default:
+    return nullptr;
+  }
 }
 
 // Object definitions /////////////////////////////////////////////////////////
@@ -438,11 +526,14 @@ void Object::updateANARIParameter(anari::Device d,
   } else if (!p.value().holdsObject()) {
     if (p.value().type() == ANARI_FLOAT32_VEC2
         && p.usage() & ParameterUsageHint::DIRECTION) {
-      anari::setParameter(d, o, n, math::azelToDir(p.value().get<float2>()));
+      anari::setParameter(
+          d, o, n, math::azelToDir(p.value().get<math::float2>()));
     } else if (p.value().type() == ANARI_FLOAT32_VEC2
         && p.usage() & ParameterUsageHint::VALUE_RANGE_TRANSFORM) {
-      anari::setParameter(
-          d, o, n, math::makeValueRangeTransform(p.value().get<float2>()));
+      anari::setParameter(d,
+          o,
+          n,
+          math::makeValueRangeTransform(p.value().get<math::float2>()));
     } else {
       anari::setParameter(d, o, n, p.value().type(), p.value().data());
     }
@@ -536,6 +627,99 @@ void print(const Object &obj, std::ostream &out)
     out << std::setw(20) << name << "\t| " << anari::toString(p.value().type())
         << '\n';
   }
+}
+
+Object *cloneObject(const Object *object)
+{
+  if (!object) {
+    logError("cloneObject() called with a null object");
+    return nullptr;
+  }
+
+  if (!object->scene()) {
+    logError("cloneObject() called on object not owned by a Scene");
+    return nullptr;
+  }
+
+  const auto cloneName =
+      object->name().empty() ? std::string() : object->name() + "_clone";
+  const Any sourceRef(object->type(), object->index());
+
+  auto *clone = createCloneDestination(*object->scene(), *object);
+  if (!clone) {
+    logError("cloneObject() unable to create clone of type %s",
+        anari::toString(object->type()));
+    return nullptr;
+  }
+
+  object = object->scene()->getObject(sourceRef);
+  if (!object) {
+    logError("cloneObject() lost source object after creating clone");
+    return nullptr;
+  }
+
+  clone->removeAllParameters();
+  for (size_t i = 0; i < object->numParameters(); ++i) {
+    const auto &src = object->parameterAt(i);
+    auto &dst = clone->addParameter(src.name());
+    dst.setDescription(src.description().c_str());
+    dst.setUsage(src.usage());
+    dst.setEnabled(src.isEnabled());
+    if (src.hasMin())
+      dst.setMin(src.min());
+    if (src.hasMax())
+      dst.setMax(src.max());
+    if (!src.stringValues().empty()) {
+      dst.setStringValues(src.stringValues());
+      dst.setStringSelection(src.stringSelection());
+    }
+    dst.setValue(src.value());
+  }
+
+  for (size_t i = 0; i < object->numMetadata(); ++i) {
+    std::string name = object->getMetadataName(i);
+    anari::DataType type = ANARI_UNKNOWN;
+    const void *ptr = nullptr;
+    size_t size = 0;
+    object->getMetadataArray(name, &type, &ptr, &size);
+    if (type != ANARI_UNKNOWN)
+      clone->setMetadataArray(name, type, ptr, size);
+    else {
+      const Any value = object->getMetadataValue(name);
+      if (value.valid())
+        clone->setMetadataValue(name, value);
+    }
+  }
+
+  if (anari::isArray(object->type())) {
+    const auto &array = static_cast<const Array &>(*object);
+    auto &arrayClone = static_cast<Array &>(*clone);
+    if (array.kind() != Array::MemoryKind::PROXY) {
+      const size_t numBytes = array.size() * array.elementSize();
+      if (numBytes > 0) {
+        std::vector<uint8_t> arrayBytes(numBytes);
+        if (array.kind() == Array::MemoryKind::HOST) {
+          std::memcpy(arrayBytes.data(), array.data(), numBytes);
+#if TSD_USE_CUDA
+        } else if (array.kind() == Array::MemoryKind::CUDA) {
+          cudaMemcpy(arrayBytes.data(),
+              array.data(),
+              numBytes,
+              cudaMemcpyDeviceToHost);
+#endif
+        }
+        if (auto *dst = arrayClone.map()) {
+          std::memcpy(dst, arrayBytes.data(), arrayBytes.size());
+          arrayClone.unmap();
+        }
+      }
+    }
+  }
+
+  if (!cloneName.empty())
+    clone->setName(cloneName);
+
+  return clone;
 }
 
 std::vector<std::string> getANARIObjectSubtypes(

@@ -463,13 +463,22 @@ void BaseViewport::ui_menubar_Renderer()
       ImGui::Text("Subtype:");
       ImGui::Indent(INDENT_AMOUNT);
       for (int i = 0; i < m_renderers.objects.size(); i++) {
+        ImGui::PushID(i);
         auto ro = m_renderers.objects[i];
-        const char *rName = ro->subtype().c_str();
+        const std::string &oName = ro->name();
+        const char *rName =
+            oName.empty() ? ro->subtype().c_str() : oName.c_str();
         if (ImGui::RadioButton(rName, m_renderers.current == ro))
           m_renderers.current = ro;
+        ImGui::PopID();
       }
       ImGui::Unindent(INDENT_AMOUNT);
     }
+
+    ImGui::Separator();
+
+    if (ImGui::MenuItem("Clone Current Renderer"))
+      renderer_clone();
 
     ImGui::Separator();
 

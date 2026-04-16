@@ -53,6 +53,7 @@ struct BaseViewport : public Window
   virtual void camera_resetView(bool resetAzEl = true) = 0;
   virtual void camera_centerView() = 0;
 
+  virtual void renderer_clone() = 0;
   virtual void renderer_resetParameterDefaults() = 0;
 
   bool gizmo_canShow() const;

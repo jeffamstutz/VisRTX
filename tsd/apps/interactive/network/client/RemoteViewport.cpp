@@ -174,6 +174,12 @@ void RemoteViewport::camera_centerView()
       "Camera center view is not currently supported in RemoteViewport.");
 }
 
+void RemoteViewport::renderer_clone()
+{
+  tsd::core::logWarning(
+      "Renderer cloning is not currently supported in RemoteViewport.");
+}
+
 void RemoteViewport::renderer_resetParameterDefaults()
 {
   if (!m_renderers.current)

@@ -212,6 +212,7 @@ struct Object : public ParameterObserver
 };
 
 void print(const Object &obj, std::ostream &out = std::cout);
+Object *cloneObject(const Object *object);
 
 // Type trait-like helper functions //
 

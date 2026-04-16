@@ -445,6 +445,24 @@ void Viewport::camera_centerView()
   m_camera.arcballToken = 0;
 }
 
+void Viewport::renderer_clone()
+{
+  if (!m_renderers.current)
+    return;
+
+  auto *clone = tsd::scene::cloneObject(m_renderers.current.get());
+  if (!clone || clone->type() != ANARI_RENDERER)
+    return;
+
+  auto cloneRef =
+      appContext()->tsd.scene.getObject<tsd::scene::Renderer>(clone->index());
+  if (!cloneRef)
+    return;
+
+  m_renderers.objects.push_back(cloneRef);
+  m_renderers.current = cloneRef;
+}
+
 void Viewport::renderer_resetParameterDefaults()
 {
   if (!m_device || !m_renderers.current)
