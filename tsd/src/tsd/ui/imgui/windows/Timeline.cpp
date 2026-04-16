@@ -91,15 +91,18 @@ void Timeline::buildUI_transport()
   auto *ctx = appContext();
   auto &scene = ctx->tsd.scene;
   auto &animMgr = ctx->tsd.animationMgr;
+  const float uiScale = ImGui::GetIO().FontGlobalScale;
 
-  ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(16.f, 2.f));
+  ImGui::PushStyleVar(
+      ImGuiStyleVar_CellPadding, ImVec2(16.f * uiScale, 2.f * uiScale));
 
   if (ImGui::BeginTable("##controls",
           5,
           ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_BordersInnerV)) {
     ImGui::TableNextRow();
 
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.f, 4.f));
+    ImGui::PushStyleVar(
+        ImGuiStyleVar_FramePadding, ImVec2(8.f * uiScale, 4.f * uiScale));
 
     // Play/Pause
     ImGui::TableNextColumn();
@@ -160,10 +163,13 @@ void Timeline::buildUI_canvas()
   auto *ctx = appContext();
   auto &scene = ctx->tsd.scene;
   auto &animMgr = ctx->tsd.animationMgr;
+  const float uiScale = ImGui::GetIO().FontGlobalScale;
+  auto scaled = [uiScale](float value) { return value * uiScale; };
 
-  const float nameColWidth = 150.f;
-  const float rowHeight = 20.f;
-  const float rulerHeight = 24.f;
+  const float nameColWidth = scaled(150.f);
+  const float rowHeight = scaled(20.f);
+  const float rulerHeight = scaled(24.f);
+  const float pixelsPerFrame = m_pixelsPerFrame * uiScale;
 
   int totalFrames = animMgr.getAnimationTotalFrames();
   int currentFrame = animMgr.getAnimationFrame();
@@ -178,12 +184,13 @@ void Timeline::buildUI_canvas()
     }
   }
 
-  float totalCanvasWidth = m_pixelsPerFrame * (totalFrames - 1);
+  float totalCanvasWidth = pixelsPerFrame * (totalFrames - 1);
   auto &anims = animMgr.animations();
   size_t numAnims = anims.size();
-  float keysColWidth = std::max(canvasWidth, totalCanvasWidth + 20.f);
+  float keysColWidth = std::max(canvasWidth, totalCanvasWidth + scaled(20.f));
 
-  ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(4.f, 8.f));
+  ImGui::PushStyleVar(
+      ImGuiStyleVar_CellPadding, ImVec2(scaled(4.f), scaled(8.f)));
 
   const ImGuiTableFlags tableFlags = ImGuiTableFlags_ScrollX
       | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersInnerV
@@ -212,30 +219,30 @@ void Timeline::buildUI_canvas()
       const int tickInterval =
           m_pixelsPerFrame < 4.f ? 20 : (m_pixelsPerFrame < 10.f ? 10 : 5);
       for (int f = 0; f < totalFrames; f += tickInterval) {
-        float x = rulerPos.x + f * m_pixelsPerFrame;
-        draw->AddLine(ImVec2(x, rulerPos.y + rulerHeight - 8.f),
+        float x = rulerPos.x + f * pixelsPerFrame;
+        draw->AddLine(ImVec2(x, rulerPos.y + rulerHeight - scaled(8.f)),
             ImVec2(x, rulerPos.y + rulerHeight),
             IM_COL32(200, 200, 200, 255));
         char buf[16];
         std::snprintf(buf, sizeof(buf), "%d", f);
-        draw->AddText(ImVec2(x + 2.f, rulerPos.y + 2.f),
+        draw->AddText(ImVec2(x + scaled(2.f), rulerPos.y + scaled(2.f)),
             IM_COL32(200, 200, 200, 255),
             buf);
       }
 
-      float scrubX = rulerPos.x + currentFrame * m_pixelsPerFrame;
+      float scrubX = rulerPos.x + currentFrame * pixelsPerFrame;
       float scrubLineHeight = rulerHeight + numAnims * rowHeight;
       draw->AddLine(ImVec2(scrubX, rulerPos.y),
           ImVec2(scrubX, rulerPos.y + scrubLineHeight),
           IM_COL32(255, 80, 80, 255),
-          2.f);
+          scaled(2.f));
 
-      ImGui::SetCursorScreenPos(ImVec2(scrubX - 6.f, rulerPos.y));
-      ImGui::InvisibleButton("##scrubber", ImVec2(12.f, rulerHeight));
+      ImGui::SetCursorScreenPos(ImVec2(scrubX - scaled(6.f), rulerPos.y));
+      ImGui::InvisibleButton("##scrubber", ImVec2(scaled(12.f), rulerHeight));
       if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0)) {
         float dx = ImGui::GetIO().MouseDelta.x;
         int newFrame =
-            std::clamp(currentFrame + static_cast<int>(dx / m_pixelsPerFrame),
+            std::clamp(currentFrame + static_cast<int>(dx / pixelsPerFrame),
                 0,
                 totalFrames - 1);
         animMgr.setAnimationFrame(newFrame);
@@ -246,7 +253,7 @@ void Timeline::buildUI_canvas()
       if (ImGui::IsItemClicked(0)) {
         float mx = ImGui::GetMousePos().x - rulerPos.x;
         int newFrame = std::clamp(
-            static_cast<int>(mx / m_pixelsPerFrame), 0, totalFrames - 1);
+            static_cast<int>(mx / pixelsPerFrame), 0, totalFrames - 1);
         animMgr.setAnimationFrame(newFrame);
       }
     }
@@ -273,7 +280,7 @@ void Timeline::buildUI_canvas()
         std::snprintf(label, sizeof(label), "%s", anim.name().c_str());
 
       float colW = ImGui::GetContentRegionAvail().x;
-      if (ImGui::Button(label, ImVec2(colW - 30.f, rowHeight))) {
+      if (ImGui::Button(label, ImVec2(colW - scaled(30.f), rowHeight))) {
         if (ImGui::GetIO().KeyCtrl) {
           if (selected)
             m_selectedTracks.erase(i);
@@ -319,9 +326,9 @@ void Timeline::buildUI_canvas()
             continue;
           for (size_t ki = 0; ki < b.timeBase().size(); ki++) {
             float kx = rowPos.x
-                + b.timeBase()[ki] * (totalFrames - 1) * m_pixelsPerFrame;
+                + b.timeBase()[ki] * (totalFrames - 1) * pixelsPerFrame;
             float ky = rowPos.y + rowHeight * 0.5f;
-            float r = 4.f;
+            float r = scaled(4.f);
             uint32_t fillCol = (bi == 0) ? IM_COL32(80, 200, 255, 255)
                                          : IM_COL32(80, 255, 120, 255);
             draw->AddQuadFilled(ImVec2(kx, ky - r),
@@ -359,9 +366,9 @@ void Timeline::buildUI_canvas()
             continue;
           for (size_t ki = 0; ki < tfb.timeBase().size(); ki++) {
             float kx = rowPos.x
-                + tfb.timeBase()[ki] * (totalFrames - 1) * m_pixelsPerFrame;
+                + tfb.timeBase()[ki] * (totalFrames - 1) * pixelsPerFrame;
             float ky = rowPos.y + rowHeight * 0.5f;
-            float r = 5.f;
+            float r = scaled(5.f);
             uint32_t fillCol = selected ? IM_COL32(255, 200, 50, 255)
                                         : IM_COL32(200, 160, 30, 255);
             draw->AddQuadFilled(ImVec2(kx, ky - r),
