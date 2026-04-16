@@ -136,8 +136,8 @@ struct Viewport : public BaseViewport
 
   float m_latestFL{0.f};
   float m_latestAnariFL{0.f};
-  float m_minFL{std::numeric_limits<float>::max()};
-  float m_maxFL{-std::numeric_limits<float>::max()};
+  std::optional<float> m_minFL;
+  std::optional<float> m_maxFL;
 };
 
 } // namespace tsd::ui::imgui

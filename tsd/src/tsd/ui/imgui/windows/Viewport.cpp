@@ -128,8 +128,8 @@ void Viewport::setLibrary(const std::string &libName, bool doAsync)
     m_libName = libName;
 
     m_latestFL = 0.f;
-    m_minFL = std::numeric_limits<float>::infinity();
-    m_maxFL = -std::numeric_limits<float>::infinity();
+    m_minFL.reset();
+    m_maxFL.reset();
 
     if (d) {
       tsd::core::logStatus("[viewport] setting up renderer objects...");
@@ -596,8 +596,8 @@ void Viewport::updateImage()
   anari::getProperty(m_device, frame, "duration", duration, ANARI_NO_WAIT);
 
   m_latestAnariFL = duration * 1000;
-  m_minFL = std::min(m_minFL, m_latestAnariFL);
-  m_maxFL = std::max(m_maxFL, m_latestAnariFL);
+  m_minFL = m_minFL ? std::min(*m_minFL, m_latestAnariFL) : m_latestAnariFL;
+  m_maxFL = m_maxFL ? std::max(*m_maxFL, m_latestAnariFL) : m_latestAnariFL;
 }
 
 void Viewport::syncImagePassState()
@@ -614,8 +614,10 @@ void Viewport::syncImagePassState()
     m_visualizeAOVPass->setEdgeInvert(m_edgeInvert);
   }
 
-  m_anariPass->setEnableAlbedo(m_visualizeAOV == tsd::rendering::AOVType::ALBEDO);
-  m_anariPass->setEnableNormals(m_visualizeAOV == tsd::rendering::AOVType::NORMAL);
+  m_anariPass->setEnableAlbedo(
+      m_visualizeAOV == tsd::rendering::AOVType::ALBEDO);
+  m_anariPass->setEnableNormals(
+      m_visualizeAOV == tsd::rendering::AOVType::NORMAL);
   m_anariPass->setEnablePrimitiveId(
       m_visualizeAOV == tsd::rendering::AOVType::PRIMITIVE_ID);
   m_anariPass->setEnableInstanceId(
@@ -880,8 +882,8 @@ void Viewport::ui_menubar_Viewport()
       ImGui::Checkbox("Animation Time Slider", &m_showAnimationSlider);
       ImGui::Checkbox("Info Window", &m_showOverlay);
       if (ImGui::MenuItem("Reset Timing Stats")) {
-        m_minFL = m_latestFL;
-        m_maxFL = m_latestFL;
+        m_minFL.reset();
+        m_maxFL.reset();
       }
       ImGui::Unindent(INDENT_AMOUNT);
     }
@@ -1022,8 +1024,8 @@ void Viewport::ui_overlay()
       ImGui::Text("progress: ---");
     ImGui::Text(" display: %.2fms", m_latestFL);
     ImGui::Text("   ANARI: %.2fms", m_latestAnariFL);
-    ImGui::Text("   (min): %.2fms", m_minFL);
-    ImGui::Text("   (max): %.2fms", m_maxFL);
+    ImGui::Text("   (min): %.2fms", m_minFL ? *m_minFL : 0.f);
+    ImGui::Text("   (max): %.2fms", m_maxFL ? *m_maxFL : 0.f);
 
     const auto &passTimings = imagePipeline().getPassTimings();
     if (!passTimings.empty()) {
