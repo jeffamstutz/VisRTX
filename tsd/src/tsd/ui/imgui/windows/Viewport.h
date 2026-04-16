@@ -66,6 +66,7 @@ struct Viewport : public BaseViewport
 
   void updateFrame();
   void updateImage();
+  void syncImagePassState();
   void updateDisplayPassState();
 
   void ui_menubar();

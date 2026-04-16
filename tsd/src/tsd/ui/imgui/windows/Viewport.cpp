@@ -408,12 +408,13 @@ void Viewport::imagePipeline_populate(tsd::rendering::ImagePipeline &p)
   m_visualizeAOVPass = p.emplace_back<tsd::rendering::VisualizeAOVPass>();
   m_visualizeAOVPass->setEnabled(false);
   m_visualizeAOVPass->setEdgeInvert(m_edgeInvert);
-  updateDisplayPassState();
 
   m_outlinePass = p.emplace_back<tsd::rendering::OutlineRenderPass>();
 
   m_outputPass = p.emplace_back<tsd::rendering::CopyToSDLTexturePass>(
       m_app->sdlRenderer());
+
+  syncImagePassState();
 }
 
 void Viewport::camera_resetView(bool resetAzEl)
@@ -599,6 +600,36 @@ void Viewport::updateImage()
   m_maxFL = std::max(m_maxFL, m_latestAnariFL);
 }
 
+void Viewport::syncImagePassState()
+{
+  if (!m_anariPass)
+    return;
+
+  m_anariPass->setColorFormat(m_colorFormat);
+
+  if (m_visualizeAOVPass) {
+    m_visualizeAOVPass->setAOVType(m_visualizeAOV);
+    m_visualizeAOVPass->setDepthRange(
+        m_depthVisualMinimum, m_depthVisualMaximum);
+    m_visualizeAOVPass->setEdgeInvert(m_edgeInvert);
+  }
+
+  m_anariPass->setEnableAlbedo(m_visualizeAOV == tsd::rendering::AOVType::ALBEDO);
+  m_anariPass->setEnableNormals(m_visualizeAOV == tsd::rendering::AOVType::NORMAL);
+  m_anariPass->setEnablePrimitiveId(
+      m_visualizeAOV == tsd::rendering::AOVType::PRIMITIVE_ID);
+  m_anariPass->setEnableInstanceId(
+      m_visualizeAOV == tsd::rendering::AOVType::INSTANCE_ID);
+
+  const auto selectedNode = appContext()->getFirstSelected();
+  const bool needIDs = selectedNode.valid()
+      || m_visualizeAOV == tsd::rendering::AOVType::EDGES
+      || m_visualizeAOV == tsd::rendering::AOVType::OBJECT_ID;
+  m_anariPass->setEnableIDs(needIDs);
+
+  updateDisplayPassState();
+}
+
 void Viewport::updateDisplayPassState()
 {
   if (!m_toneMapPass || !m_outputTransformPass)
@@ -665,9 +696,8 @@ void Viewport::ui_menubar_Viewport()
         format = ANARI_FLOAT32_VEC4;
 
       if (format != m_colorFormat) {
-        m_anariPass->setColorFormat(format);
         m_colorFormat = format;
-        updateDisplayPassState();
+        syncImagePassState();
       }
       ImGui::Unindent(INDENT_AMOUNT);
     }
@@ -727,19 +757,7 @@ void Viewport::ui_menubar_Viewport()
           ImGui::Combo("AOV", &aov, aovItems, IM_ARRAYSIZE(aovItems))) {
         if (aov != int(m_visualizeAOV)) {
           m_visualizeAOV = static_cast<tsd::rendering::AOVType>(aov);
-          m_visualizeAOVPass->setAOVType(m_visualizeAOV);
-          updateDisplayPassState();
-          m_anariPass->setEnableAlbedo(
-              m_visualizeAOV == tsd::rendering::AOVType::ALBEDO);
-          m_anariPass->setEnableNormals(
-              m_visualizeAOV == tsd::rendering::AOVType::NORMAL);
-          m_anariPass->setEnableIDs(
-              m_visualizeAOV == tsd::rendering::AOVType::EDGES
-              || m_visualizeAOV == tsd::rendering::AOVType::OBJECT_ID);
-          m_anariPass->setEnablePrimitiveId(
-              m_visualizeAOV == tsd::rendering::AOVType::PRIMITIVE_ID);
-          m_anariPass->setEnableInstanceId(
-              m_visualizeAOV == tsd::rendering::AOVType::INSTANCE_ID);
+          syncImagePassState();
         }
       }
 
