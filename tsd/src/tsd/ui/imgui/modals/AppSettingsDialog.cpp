@@ -79,6 +79,9 @@ void AppSettingsDialog::buildUI_applicationSettings()
   if (doUpdate)
     applySettings();
 
+  if (ImGui::Button("Save as Defaults"))
+    m_app->saveDefaultApplicationSettings();
+
   ImGui::Unindent(tsd::ui::INDENT_AMOUNT);
 }
 

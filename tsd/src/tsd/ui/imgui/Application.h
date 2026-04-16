@@ -7,10 +7,10 @@
 
 #include "modals/AppSettingsDialog.h"
 #include "modals/BlockingTaskModal.h"
+#include "modals/CuttingPlaneDialog.h"
 #include "modals/ExportNanoVDBFileDialog.h"
 #include "modals/ImportFileDialog.h"
 #include "modals/OfflineRenderModal.h"
-#include "modals/CuttingPlaneDialog.h"
 #include "modals/VorticityDialog.h"
 // tsd_app
 #include "tsd/app/Context.h"
@@ -19,6 +19,8 @@
 #include "tsd/core/TaskQueue.hpp"
 // anari_viewer
 #include <anari_viewer/Application.h>
+// std
+#include <filesystem>
 
 namespace tsd::ui::imgui {
 
@@ -59,6 +61,7 @@ class Application : public anari_viewer::Application
   void showTaskModal(FUNCTION &&f, const char *text = "Please Wait");
   void showImportFileDialog();
   void showExportNanoVDBFileDialog();
+  void saveDefaultApplicationSettings();
 
   ExtensionManager *extensionManager() const;
 
@@ -92,6 +95,11 @@ class Application : public anari_viewer::Application
 
   void saveApplicationState(const char *filename = "state.tsd");
   void loadApplicationState(const char *filename = "state.tsd");
+  void saveApplicationSettings(tsd::core::DataNode &root);
+  void loadApplicationSettings(tsd::core::DataNode &root);
+  void saveGlobalApplicationSettings();
+  void loadGlobalApplicationSettings();
+  std::filesystem::path globalApplicationSettingsFile() const;
 
   void loadStateForNextFrame();
 

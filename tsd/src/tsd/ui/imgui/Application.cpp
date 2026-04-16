@@ -17,6 +17,8 @@
 // SDL
 #include <SDL3/SDL_dialog.h>
 #include <SDL3/SDL_video.h>
+// std
+#include <cstdlib>
 
 namespace tsd::ui::imgui {
 
@@ -92,6 +94,11 @@ void Application::showExportNanoVDBFileDialog()
   m_exportNanoVDBFileDialog->show();
 }
 
+void Application::saveDefaultApplicationSettings()
+{
+  saveGlobalApplicationSettings();
+}
+
 void Application::parseCommandLine(std::vector<std::string> &args)
 {
   for (int i = 1; i < args.size(); i++) {
@@ -140,6 +147,7 @@ anari_viewer::WindowArray Application::setupWindows()
   m_applicationName = SDL_GetWindowTitle(sdlWindow());
   updateWindowTitle();
 
+  loadGlobalApplicationSettings();
   m_appSettingsDialog->applySettings();
 
   SDL_SetRenderVSync(sdlRenderer(), 1);
@@ -607,9 +615,6 @@ void Application::saveApplicationState(const char *_filename)
     tsd::core::logStatus("serializing UI state...");
     root["layout"] = ImGui::SaveIniSettingsToMemory();
 
-    // ANARIDeviceManager settings
-    ctx.anari.saveSettings(root["ANARIDeviceManager"]);
-
     // Offline rendering settings
     auto &offlineSettings = root["offlineRendering"];
     ctx.offline.saveSettings(offlineSettings);
@@ -618,8 +623,7 @@ void Application::saveApplicationState(const char *_filename)
     auto &settings = root["settings"];
     settings["logVerbose"] = ctx.logVerbose();
     settings["logEchoOutput"] = ctx.logEchoOutput();
-    settings["fontScale"] = m_uiConfig.fontScale;
-    settings["uiRounding"] = m_uiConfig.rounding;
+    saveApplicationSettings(root);
 
     // Camera poses
     auto &cameraPoses = root["cameraPoses"];
@@ -678,8 +682,7 @@ void Application::loadApplicationState(const char *filename)
     ImGui::LoadIniSettingsFromMemory(c->getValueAs<std::string>().c_str());
 
   // ANARIDeviceManager settings
-  if (auto *c = root.child("ANARIDeviceManager"); c != nullptr)
-    ctx.anari.loadSettings(*c);
+  loadApplicationSettings(root);
 
   // Offline rendering settings
   auto &offlineSettings = root["offlineRendering"];
@@ -695,9 +698,6 @@ void Application::loadApplicationState(const char *filename)
     bool logEchoOutput = ctx.logEchoOutput();
     settings["logEchoOutput"].getValue(ANARI_BOOL, &logEchoOutput);
     ctx.setLogEchoOutput(logEchoOutput);
-
-    settings["fontScale"].getValue(ANARI_FLOAT32, &m_uiConfig.fontScale);
-    settings["uiRounding"].getValue(ANARI_FLOAT32, &m_uiConfig.rounding);
   }
 
   ctx.view.poses.clear();
@@ -715,6 +715,92 @@ void Application::loadApplicationState(const char *filename)
 
   m_currentSessionFilename = filename;
   updateWindowTitle();
+}
+
+void Application::saveApplicationSettings(tsd::core::DataNode &root)
+{
+  auto &ctx = *appContext();
+
+  ctx.anari.saveSettings(root["ANARIDeviceManager"]);
+
+  auto &settings = root["settings"];
+  settings["fontScale"] = m_uiConfig.fontScale;
+  settings["uiRounding"] = m_uiConfig.rounding;
+}
+
+void Application::loadApplicationSettings(tsd::core::DataNode &root)
+{
+  auto &ctx = *appContext();
+
+  if (auto *c = root.child("ANARIDeviceManager"); c != nullptr)
+    ctx.anari.loadSettings(*c);
+
+  if (auto *c = root.child("settings"); c != nullptr) {
+    auto &settings = *c;
+    settings["fontScale"].getValue(ANARI_FLOAT32, &m_uiConfig.fontScale);
+    settings["uiRounding"].getValue(ANARI_FLOAT32, &m_uiConfig.rounding);
+  }
+}
+
+void Application::saveGlobalApplicationSettings()
+{
+  const auto filename = globalApplicationSettingsFile();
+  const auto directory = filename.parent_path();
+
+  try {
+    if (!directory.empty())
+      std::filesystem::create_directories(directory);
+  } catch (const std::exception &e) {
+    tsd::core::logError(
+        "[Application] Failed to create config directory '%s': %s",
+        directory.string().c_str(),
+        e.what());
+    return;
+  }
+
+  auto &root = m_settings.root();
+  root.reset();
+  saveApplicationSettings(root);
+
+  if (!m_settings.save(filename.string().c_str())) {
+    tsd::core::logError("[Application] Failed to save defaults to '%s'",
+        filename.string().c_str());
+    return;
+  }
+
+  tsd::core::logStatus(
+      "...saved application defaults to '%s'", filename.string().c_str());
+}
+
+void Application::loadGlobalApplicationSettings()
+{
+  const auto filename = globalApplicationSettingsFile();
+
+  if (!std::filesystem::exists(filename))
+    return;
+
+  auto &root = m_settings.root();
+  root.reset();
+  if (!m_settings.load(filename.string().c_str())) {
+    tsd::core::logWarning("[Application] Failed to load defaults from '%s'",
+        filename.string().c_str());
+    return;
+  }
+
+  loadApplicationSettings(root);
+}
+
+std::filesystem::path Application::globalApplicationSettingsFile() const
+{
+#ifdef _WIN32
+  if (const char *appData = std::getenv("APPDATA"); appData != nullptr)
+    return std::filesystem::path(appData) / "tsd" / "appSettings.tsd";
+#else
+  if (const char *home = std::getenv("HOME"); home != nullptr)
+    return std::filesystem::path(home) / ".config" / "tsd" / "appSettings.tsd";
+#endif
+
+  return std::filesystem::path("appSettings.tsd");
 }
 
 void Application::loadStateForNextFrame()
