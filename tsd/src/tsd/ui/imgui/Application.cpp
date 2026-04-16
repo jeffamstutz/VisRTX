@@ -152,6 +152,8 @@ anari_viewer::WindowArray Application::setupWindows()
 
 void Application::uiFrameStart()
 {
+  const ImGuiIO &io = ImGui::GetIO();
+
   m_ctx.tsd.animationMgr.tick();
 
   if (!m_filenameToSaveNextFrame.empty()) {
@@ -207,7 +209,7 @@ void Application::uiFrameStart()
     modalActive = true;
   }
 
-  if (ImGui::IsKeyPressed(ImGuiKey_Space))
+  if (!io.WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Space))
     m_ctx.tsd.animationMgr.togglePlay();
 
   if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_S))
