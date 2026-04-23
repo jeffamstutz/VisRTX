@@ -44,11 +44,12 @@ Viewport::~Viewport()
 
 void Viewport::buildUI()
 {
-  if (BaseViewport::viewport_isActive())
+  if (BaseViewport::viewport_isActive()) {
     BaseViewport::buildUI();
-  updateFrame();
-  updateImage();
-  BaseViewport::camera_update();
+    updateFrame();
+    updateImage();
+    BaseViewport::camera_update();
+  }
 
   ui_menubar();
 
@@ -151,6 +152,16 @@ void Viewport::setLibrary(const std::string &libName)
       tsd::core::logStatus("[viewport] setting up image pipeline...");
 
       BaseViewport::imagePipeline_setup();
+
+      // ensure first frame is rendered before we proceed
+      m_anariPass->setWorld(m_rIdx->world());
+      BaseViewport::camera_update(true);
+      updateFrame();
+
+      tsd::core::logStatus("[viewport] warming up first frame...");
+
+      m_rIdx->computeDefaultView();
+      m_anariPass->startFirstFrame(true);
       viewport_setActive(true);
 
       tsd::core::logStatus("[viewport] ...device load complete");
@@ -525,16 +536,12 @@ void Viewport::setSelectionVisibilityFilterEnabled(bool enabled)
 
 void Viewport::updateFrame()
 {
-  if (!BaseViewport::viewport_isActive())
-    return;
-
   if (m_prevRenderer == m_renderers.current && m_prevCamera == m_camera.current)
     return;
 
   if (!m_camera.current)
     m_camera.current = appContext()->tsd.scene.defaultCamera();
 
-  m_anariPass->setWorld(m_rIdx->world());
   if (m_camera.current) {
     m_anariPass->setCamera(m_rIdx->camera(m_camera.current->index()));
     m_prevCamera = m_camera.current;
@@ -547,9 +554,6 @@ void Viewport::updateFrame()
 
 void Viewport::updateImage()
 {
-  if (!BaseViewport::viewport_isActive())
-    return;
-
   auto frame = m_anariPass->getFrame();
 
   float progress = 0.f;

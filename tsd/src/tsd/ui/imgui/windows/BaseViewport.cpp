@@ -124,7 +124,7 @@ void BaseViewport::imagePipeline_teardown()
 
 void BaseViewport::camera_update(bool force)
 {
-  if (!viewport_isActive())
+  if (!force && !viewport_isActive())
     return;
 
   if (!m_camera.current)

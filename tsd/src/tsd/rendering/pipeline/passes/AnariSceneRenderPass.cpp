@@ -253,6 +253,17 @@ void AnariSceneRenderPass::setEnableNormals(bool on)
   }
 }
 
+void AnariSceneRenderPass::startFirstFrame(bool waitForCompletion)
+{
+  if (!m_firstFrame)
+    return;
+  auto dims = getDimensions();
+  anari::render(m_device, m_frame);
+  if (waitForCompletion)
+    anari::wait(m_device, m_frame);
+  m_firstFrame = false;
+}
+
 void AnariSceneRenderPass::setRunAsync(bool on)
 {
   m_runAsync = on;
@@ -290,14 +301,12 @@ void AnariSceneRenderPass::render(ImageBuffers &b, int stageId)
 {
   m_buffers.stream = b.stream;
 
-  if (m_firstFrame)
-    anari::render(m_device, m_frame);
+  startFirstFrame(false);
 
   if (!m_runAsync)
     anari::wait(m_device, m_frame);
 
   if (anari::isReady(m_device, m_frame)) {
-    m_firstFrame = false;
     copyFrameData();
     anari::render(m_device, m_frame);
   }
@@ -340,46 +349,53 @@ void AnariSceneRenderPass::copyFrameData()
 
   const tsd::math::uint2 size(getDimensions());
   const size_t totalSize = size.x * size.y;
-  if (totalSize > 0 && size.x == color.width && size.y == color.height) {
-    if (color.pixelType == ANARI_FLOAT32_VEC4) {
-      detail::copy(m_buffers.hdrColor, (float *)color.data, totalSize * 4);
-      detail::convertFloatColorBuffer_(m_buffers.stream,
-          (const float *)color.data,
-          (uint8_t *)m_buffers.color,
-          totalSize * 4);
-    } else
-      detail::copy(m_buffers.color, (uint32_t *)color.data, totalSize);
+  const bool valid = totalSize > 0 && size.x == color.width
+      && size.y == color.height && color.data != nullptr
+      && depth.data != nullptr && color.pixelType != ANARI_UNKNOWN;
+  if (!valid) {
+    anari::unmap(m_device, m_frame, colorChannel);
+    anari::unmap(m_device, m_frame, depthChannel);
+    return;
+  }
 
-    detail::copy(m_buffers.depth, depth.data, totalSize);
-    if (m_enableIDs) {
-      auto objectId = anari::map<uint32_t>(m_device, m_frame, objectIdChannel);
-      if (objectId.data)
-        detail::copy(m_buffers.objectId, objectId.data, totalSize);
-    }
-    if (m_enablePrimitiveId) {
-      auto primitiveId =
-          anari::map<uint32_t>(m_device, m_frame, primitiveIdChannel);
-      if (primitiveId.data)
-        detail::copy(m_buffers.primitiveId, primitiveId.data, totalSize);
-    }
-    if (m_enableInstanceId) {
-      auto instanceId =
-          anari::map<uint32_t>(m_device, m_frame, instanceIdChannel);
-      if (instanceId.data)
-        detail::copy(m_buffers.instanceId, instanceId.data, totalSize);
-    }
-    if (m_enableAlbedo) {
-      auto albedo =
-          anari::map<tsd::math::float3>(m_device, m_frame, albedoChannel);
-      if (albedo.data)
-        detail::copy(m_buffers.albedo, albedo.data, totalSize);
-    }
-    if (m_enableNormals) {
-      auto normal =
-          anari::map<tsd::math::float3>(m_device, m_frame, normalChannel);
-      if (normal.data)
-        detail::copy(m_buffers.normal, normal.data, totalSize);
-    }
+  if (color.pixelType == ANARI_FLOAT32_VEC4) {
+    detail::copy(m_buffers.hdrColor, (float *)color.data, totalSize * 4);
+    detail::convertFloatColorBuffer_(m_buffers.stream,
+        (const float *)color.data,
+        (uint8_t *)m_buffers.color,
+        totalSize * 4);
+  } else
+    detail::copy(m_buffers.color, (uint32_t *)color.data, totalSize);
+
+  detail::copy(m_buffers.depth, depth.data, totalSize);
+  if (m_enableIDs) {
+    auto objectId = anari::map<uint32_t>(m_device, m_frame, objectIdChannel);
+    if (objectId.data)
+      detail::copy(m_buffers.objectId, objectId.data, totalSize);
+  }
+  if (m_enablePrimitiveId) {
+    auto primitiveId =
+        anari::map<uint32_t>(m_device, m_frame, primitiveIdChannel);
+    if (primitiveId.data)
+      detail::copy(m_buffers.primitiveId, primitiveId.data, totalSize);
+  }
+  if (m_enableInstanceId) {
+    auto instanceId =
+        anari::map<uint32_t>(m_device, m_frame, instanceIdChannel);
+    if (instanceId.data)
+      detail::copy(m_buffers.instanceId, instanceId.data, totalSize);
+  }
+  if (m_enableAlbedo) {
+    auto albedo =
+        anari::map<tsd::math::float3>(m_device, m_frame, albedoChannel);
+    if (albedo.data)
+      detail::copy(m_buffers.albedo, albedo.data, totalSize);
+  }
+  if (m_enableNormals) {
+    auto normal =
+        anari::map<tsd::math::float3>(m_device, m_frame, normalChannel);
+    if (normal.data)
+      detail::copy(m_buffers.normal, normal.data, totalSize);
   }
 
   anari::unmap(m_device, m_frame, colorChannel);

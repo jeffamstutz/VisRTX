@@ -34,6 +34,8 @@ struct AnariSceneRenderPass : public ImagePass
   void setEnableAlbedo(bool on);
   void setEnableNormals(bool on);
 
+  void startFirstFrame(bool waitForCompletion = false);
+
   // default' true', if 'false', then anari::wait() on each pass
   void setRunAsync(bool on);
 
