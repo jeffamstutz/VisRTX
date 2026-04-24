@@ -114,6 +114,7 @@ int main()
   arp->setRenderer(renderer);
   arp->setCamera(camera);
   arp->setEnableIDs(true);
+  arp->setRunAsync(false);
 
   anari::release(device, camera);
   anari::release(device, renderer);
