@@ -144,8 +144,8 @@ void Viewport::setLibrary(const std::string &libName)
 
     if (d) {
       m_device = d;
-      m_deviceSupportsPrimitiveId = deviceSupportsExtension(
-          d, "ANARI_KHR_FRAME_CHANNEL_PRIMITIVE_ID");
+      m_deviceSupportsPrimitiveId =
+          deviceSupportsExtension(d, "ANARI_KHR_FRAME_CHANNEL_PRIMITIVE_ID");
 
       if (!m_deviceSupportsPrimitiveId
           && m_visualizeAOV == tsd::rendering::AOVType::PRIMITIVE_ID) {
@@ -556,6 +556,11 @@ void Viewport::pick(tsd::math::int2 l, bool selectObject)
   m_pickCoord = l;
   m_pickPass->setEnabled(true);
   m_anariPass->setEnableIDs(true);
+
+  // Render synchronous frame to ensure pick pass has available AOVs available
+  m_anariPass->setRunAsync(false);
+  BaseViewport::imagePipeline_render();
+  m_anariPass->setRunAsync(true);
 }
 
 void Viewport::setSelectionVisibilityFilterEnabled(bool enabled)

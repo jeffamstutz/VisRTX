@@ -231,6 +231,8 @@ void AnariSceneRenderPass::startFirstFrame(bool waitForCompletion)
 void AnariSceneRenderPass::setRunAsync(bool on)
 {
   m_runAsync = on;
+  if (!on)
+    anari::wait(m_device, m_frame);
 }
 
 anari::Frame AnariSceneRenderPass::getFrame() const
