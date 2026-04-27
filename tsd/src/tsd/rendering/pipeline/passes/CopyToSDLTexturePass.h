@@ -18,12 +18,12 @@ struct CopyToSDLTexturePass : public ImagePass
 {
   CopyToSDLTexturePass(SDL_Renderer *renderer);
   ~CopyToSDLTexturePass() override;
-  const char *name() const override { return "Copy To SDL"; }
+  const char *name() const override;
 
   SDL_Texture *getTexture() const;
 
  private:
-  bool checkGLInterop() const;
+  void checkGLInterop() const;
   void render(ImageBuffers &b, int stageId) override;
   void updateSize() override;
 

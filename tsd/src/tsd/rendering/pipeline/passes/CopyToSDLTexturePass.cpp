@@ -4,14 +4,16 @@
 #if ENABLE_SDL
 
 #include "CopyToSDLTexturePass.h"
+// tsd_core
 #include "tsd/core/Logging.hpp"
-
+// cuda + SDL
 #ifdef ENABLE_CUDA
-// cuda
 #include <SDL3/SDL_opengl.h>
 #include <cuda_gl_interop.h>
 #include <cuda_runtime_api.h>
 #endif
+// std
+#include <optional>
 
 namespace tsd::rendering {
 
@@ -19,7 +21,7 @@ struct CopyToSDLTexturePass::CopyToSDLTexturePassImpl
 {
   SDL_Renderer *renderer{nullptr};
   SDL_Texture *texture{nullptr};
-  bool glInteropAvailable{false};
+  std::optional<bool> glInteropAvailable;
 #ifdef ENABLE_CUDA
   cudaGraphicsResource_t graphicsResource{nullptr};
 #endif
@@ -29,7 +31,6 @@ CopyToSDLTexturePass::CopyToSDLTexturePass(SDL_Renderer *renderer)
 {
   m_impl = new CopyToSDLTexturePassImpl;
   m_impl->renderer = renderer;
-  m_impl->glInteropAvailable = checkGLInterop();
 }
 
 CopyToSDLTexturePass::~CopyToSDLTexturePass()
@@ -43,12 +44,17 @@ CopyToSDLTexturePass::~CopyToSDLTexturePass()
   m_impl = nullptr;
 }
 
+const char *CopyToSDLTexturePass::name() const
+{
+  return "Copy-To-SDL";
+}
+
 SDL_Texture *CopyToSDLTexturePass::getTexture() const
 {
   return m_impl->texture;
 }
 
-bool CopyToSDLTexturePass::checkGLInterop() const
+void CopyToSDLTexturePass::checkGLInterop() const
 {
 #ifdef ENABLE_CUDA
   unsigned int numDevices = 0;
@@ -57,9 +63,13 @@ bool CopyToSDLTexturePass::checkGLInterop() const
   cudaError_t err =
       cudaGLGetDevices(&numDevices, cudaDevices, 8, cudaGLDeviceListAll);
   if (err != cudaSuccess) {
-    tsd::core::logWarning("[ImagePipeline] failed to get CUDA GL devices");
-    cudaGetLastError(); // Clear the error so it is not captured by subsequent calls.
-    return false;
+    tsd::core::logWarning(
+        "[ImagePipeline] failed to get CUDA GL devices -- reason: %s",
+        cudaGetErrorString(err));
+    cudaGetLastError(); // Clear the error so it is not captured by subsequent
+                        // calls.
+    m_impl->glInteropAvailable.reset();
+    return;
   }
 
   if (numDevices > 0) {
@@ -67,9 +77,9 @@ bool CopyToSDLTexturePass::checkGLInterop() const
     cudaGetDevice(&currentDevice);
     for (unsigned int i = 0; i < numDevices; ++i) {
       if (currentDevice == cudaDevices[i]) {
-        tsd::core::logStatus(
-            "[ImagePipeline] using CUDA-GL interop via SDL3");
-        return true;
+        tsd::core::logStatus("[ImagePipeline] using CUDA-GL interop via SDL3");
+        m_impl->glInteropAvailable = true;
+        return;
       }
     }
   }
@@ -77,15 +87,21 @@ bool CopyToSDLTexturePass::checkGLInterop() const
 
   tsd::core::logWarning(
       "[ImagePipeline] unable to use CUDA-GL interop via SDL3");
-  return false;
+  m_impl->glInteropAvailable = false;
 }
 
 void CopyToSDLTexturePass::render(ImageBuffers &b, int /*stageId*/)
 {
+  if (!m_impl->glInteropAvailable) {
+    checkGLInterop();
+    if (m_impl->glInteropAvailable && *m_impl->glInteropAvailable)
+      updateSize();
+  }
+
   const auto size = getDimensions();
 
 #ifdef ENABLE_CUDA
-  if (m_impl->glInteropAvailable && m_impl->graphicsResource) {
+  if (m_impl->graphicsResource) {
     cudaGraphicsMapResources(1, &m_impl->graphicsResource);
     cudaArray_t array;
     cudaGraphicsSubResourceGetMappedArray(
@@ -129,10 +145,10 @@ void CopyToSDLTexturePass::updateSize()
       newSize.y);
 
 #ifdef ENABLE_CUDA
-  if (m_impl->glInteropAvailable) {
+  if (m_impl->glInteropAvailable && *m_impl->glInteropAvailable) {
     SDL_PropertiesID propID = SDL_GetTextureProperties(m_impl->texture);
-    Sint64 texID =
-        SDL_GetNumberProperty(propID, SDL_PROP_TEXTURE_OPENGL_TEXTURE_NUMBER, -1);
+    Sint64 texID = SDL_GetNumberProperty(
+        propID, SDL_PROP_TEXTURE_OPENGL_TEXTURE_NUMBER, -1);
 
     if (texID > 0) {
       cudaGraphicsGLRegisterImage(&m_impl->graphicsResource,
