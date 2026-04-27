@@ -68,7 +68,7 @@ void CopyToSDLTexturePass::checkGLInterop() const
         cudaGetErrorString(err));
     cudaGetLastError(); // Clear the error so it is not captured by subsequent
                         // calls.
-    m_impl->glInteropAvailable.reset();
+    m_impl->glInteropAvailable = false;
     return;
   }
 
